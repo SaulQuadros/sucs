@@ -104,11 +104,20 @@ col1, col2, col3 = st.columns([1.2, 1, 1])
 
 with col1:
     st.subheader("Granulometria")
-    pct_retido_200 = st.number_input("% retido na peneira #200", 0.0, 100.0, step=0.1)
-    st.caption("≥ 50% retido ⇒ granulação grossa; < 50% ⇒ granulação fina.")
-    st.markdown("**Na fração > #200 (se grossa):**")
-    pct_pedregulho = st.number_input("% pedregulho (> #4)", 0.0, 100.0, step=0.1)
-    pct_areia = st.number_input("% areia (entre #4 e #200)", 0.0, 100.0, step=0.1)
+    pct_retido_200 = st.number_input(
+        "% retido na peneira #200", 0.0, 100.0, step=0.1)
+    fines = max(0.0, 100.0 - pct_retido_200)
+    st.caption(f"≥ 50% retido ⇒ granulação grossa; < 50% ⇒ fina | % de finos (passando #200) = {fines:.1f}%")
+
+    coarse = pct_retido_200 >= 50.0
+    st.markdown("**Na fração > #200 (apenas se grossa):**")
+    if coarse:
+        pct_pedregulho = st.number_input("% pedregulho (> #4)", 0.0, 100.0, step=0.1)
+        pct_areia = max(0.0, min(100.0, 100.0 - pct_pedregulho))
+        st.number_input("% areia (entre #4 e #200)", value=pct_areia, step=0.1, disabled=True)
+    else:
+        pct_pedregulho = 0.0
+        pct_areia = 0.0
 
 with col2:
     st.subheader("Plasticidade (Atterberg)")
@@ -154,9 +163,15 @@ with col2:
 
 with col3:
     st.subheader("Opcional")
-    use_grad = st.checkbox("Usar Cu/Cc para decidir W/P (limpo < 5% de finos; ou 5–12% no 1º símbolo)", value=False, help="Válido apenas para solos de granulação grossa (G/S).")
-    Cu = st.number_input("Cu (uniformidade)", 0.0, 1000.0, step=0.1, value=0.0 if not use_grad else 6.0, disabled=False)
-    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5 if not use_grad else 1.5, disabled=False)
+    allowed_grad = coarse and (fines < 5.0)
+    use_grad = st.checkbox(
+        "Usar Cu/Cc para decidir W/P (somente grossa com finos < 5%)",
+        value=False,
+        help="Cu/Cc só se aplicam a solos de granulação grossa (G/S) com finos < 5%.",
+        disabled=not allowed_grad,
+    )
+    Cu = st.number_input("Cu (uniformidade)", 0.0, 1000.0, step=0.1, value=6.0, disabled=not (use_grad and allowed_grad))
+    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))
     organico = st.checkbox("Aspecto orgânico marcante (cor escura, odor, fibras)?", value=False)
     turfa = st.checkbox("Altamente orgânico (turfa)?", value=False) if organico else False
 
@@ -175,7 +190,8 @@ if st.button("Classificar (formulário acima)"):
         "pct_pedregulho_coarse": pct_pedregulho,
         "pct_areia_coarse": pct_areia,
         "LL": LL, "LP": LP,
-        "Cu": Cu if use_grad else None, "Cc": Cc if use_grad else None,
+        "Cu": (Cu if (use_grad and allowed_grad) else None),
+        "Cc": (Cc if (use_grad and allowed_grad) else None),
         "organico": organico, "turfa": turfa,
     }
     grupo, relatorio = classify_sucs(data)
