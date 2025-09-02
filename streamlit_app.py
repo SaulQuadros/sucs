@@ -39,6 +39,14 @@ with col2:
     xs = [0, max(60, LL + 10)]
     ys = [LINE_A_SLOPE*(xs[0]-20), LINE_A_SLOPE*(xs[1]-20)]
     ax.plot(xs, ys)  # linha A
+    # Guias verticais solicitadas (LL=30 e LL=50)
+    ax.axvline(30, linestyle='--', linewidth=1)
+    ax.axvline(50, linestyle='--', linewidth=1)
+    # Rótulos discretos no topo
+    ylim = ax.get_ylim()
+    ax.text(30, ylim[1]*0.95, "LL=30", rotation=90, va='top', ha='right', fontsize=9)
+    ax.text(50, ylim[1]*0.95, "LL=50", rotation=90, va='top', ha='right', fontsize=9)
+
     ax.scatter([LL], [IP])
     ax.set_xlabel("LL")
     ax.set_ylabel("IP")
