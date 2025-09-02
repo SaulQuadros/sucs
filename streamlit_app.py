@@ -41,6 +41,11 @@ with col2:
     xs = [0, x_max]
     ys = [LINE_A_SLOPE*(xs[0]-20), LINE_A_SLOPE*(xs[1]-20)]
     ax.plot(xs, ys)  # linha A
+    # Segmento horizontal tracejado: IP = 5 até intersectar a linha A
+    IP_GUIDE = 5.0
+    x_int = (IP_GUIDE / LINE_A_SLOPE) + 20.0
+    ax.hlines(IP_GUIDE, 0, min(x_int, x_max), linestyles='--', linewidth=1)
+
 
     # Guias verticais pedidas
     ax.axvline(30, linestyle='--', linewidth=1)
@@ -51,7 +56,7 @@ with col2:
 
     # Limites dos eixos: começar em 0 para não exibir IP negativo
     y_line_end = LINE_A_SLOPE*(x_max - 20)
-    y_max = max(40, IP + 10, y_line_end + 5)
+    y_max = max(40, IP + 10, y_line_end + 5, 5 + 10)  # garante espaço para a guia IP=5
     ax.set_xlim(0, x_max)
     ax.set_ylim(0, y_max)
 
