@@ -9,6 +9,73 @@ import matplotlib.pyplot as plt
 
 from sucs_core import classify_sucs, classify_dataframe, LINE_A_SLOPE
 
+
+def build_excel_template_bytes():
+    import io
+    import pandas as pd
+    # monta um exemplo por grupo (mesma lógica dos exemplos gerados anteriormente)
+    rows = [
+        # grupo, descricao, params...
+        ("GW", "Cascalho bem graduado, com/sem areia, poucos finos",
+            dict(pct_retido_200=97, pct_pedregulho_coarse=70, pct_areia_coarse=30, LL=25, LP=20, Cu=8, Cc=2.0, organico=False, turfa=False)),
+        ("GP", "Cascalho mal graduado, com/sem areia, poucos finos",
+            dict(pct_retido_200=96, pct_pedregulho_coarse=60, pct_areia_coarse=40, LL=25, LP=20, Cu=2, Cc=0.6, organico=False, turfa=False)),
+        ("GM", "Cascalho siltoso (fino abaixo da linha A)",
+            dict(pct_retido_200=75, pct_pedregulho_coarse=60, pct_areia_coarse=40, LL=40, LP=27, organico=False, turfa=False)),
+        ("GC", "Cascalho argiloso (fino acima da linha A)",
+            dict(pct_retido_200=75, pct_pedregulho_coarse=60, pct_areia_coarse=40, LL=40, LP=20, organico=False, turfa=False)),
+        ("SW", "Areia bem graduada, com cascalho, poucos finos",
+            dict(pct_retido_200=97, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=25, LP=20, Cu=7, Cc=1.5, organico=False, turfa=False)),
+        ("SP", "Areia mal graduada, com cascalho, poucos finos",
+            dict(pct_retido_200=96, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=25, LP=20, Cu=3, Cc=0.8, organico=False, turfa=False)),
+        ("SM", "Areia siltosa (fino abaixo da linha A)",
+            dict(pct_retido_200=75, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=40, LP=27, organico=False, turfa=False)),
+        ("SC", "Areia argilosa (fino acima da linha A)",
+            dict(pct_retido_200=75, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=40, LP=20, organico=False, turfa=False)),
+        ("ML", "Silte de baixo LL; areias muito finas siltosas; pó-de-pedra",
+            dict(pct_retido_200=30, LL=35, LP=25, organico=False, turfa=False)),
+        ("CL", "Argila de baixa a média plasticidade",
+            dict(pct_retido_200=30, LL=35, LP=22, organico=False, turfa=False)),
+        ("OL", "Silte orgânico de baixa plasticidade",
+            dict(pct_retido_200=30, LL=35, LP=20, organico=True, turfa=False)),
+        ("MH", "Silte de alto LL; materiais micáceos/diatomáceos",
+            dict(pct_retido_200=30, LL=70, LP=40, organico=False, turfa=False)),
+        ("CH", "Argila de alta plasticidade",
+            dict(pct_retido_200=30, LL=70, LP=25, organico=False, turfa=False)),
+        ("OH", "Silte/argila orgânicos de alto LL",
+            dict(pct_retido_200=30, LL=60, LP=30, organico=True, turfa=False)),
+        ("Pt", "Turfa",
+            dict(pct_retido_200=10, LL=150, LP=50, organico=True, turfa=True)),
+    ]
+    records = []
+    for grupo, desc, params in rows:
+        rec = dict(
+            grupo_esperado=grupo,
+            descricao_sintetica=desc,
+            projeto="Demo",
+            tecnico="Equipe",
+            amostra=grupo,
+            pct_retido_200=None,
+            pct_pedregulho_coarse=0,
+            pct_areia_coarse=0,
+            LL=None, LP=None, Cu=None, Cc=None, organico=False, turfa=False
+        )
+        rec.update(params)
+        records.append(rec)
+    df = pd.DataFrame.from_records(records, columns=[
+        "grupo_esperado","descricao_sintetica",
+        "projeto","tecnico","amostra",
+        "pct_retido_200","pct_pedregulho_coarse","pct_areia_coarse",
+        "LL","LP","Cu","Cc","organico","turfa"
+    ])
+    # Exporta para Excel em memória
+    bio = io.BytesIO()
+    with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
+        df.to_excel(writer, index=False, sheet_name="exemplos")
+    bio.seek(0)
+    return bio.getvalue()
+
+
 st.set_page_config(page_title="Classificador SUCS (DNIT)", layout="wide")
 st.title("Classificador SUCS — DNIT")
 
@@ -17,6 +84,8 @@ with st.sidebar:
     projeto = st.text_input("Nome do projeto")
     tecnico = st.text_input("Técnico responsável")
     amostra = st.text_input("Código da amostra")
+
+    st.download_button('Baixar planilha‑modelo (Excel)', data=build_excel_template_bytes(), file_name='SUCS_todos_os_grupos.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 col1, col2, col3 = st.columns([1.2, 1, 1])
 
