@@ -36,18 +36,30 @@ with col2:
     st.metric("IP = LL − LP", f"{IP:.2f}")
     # Gráfico de plasticidade simples
     fig, ax = plt.subplots()
-    xs = [0, max(60, LL + 10)]
+    # Linha A (IP = 0,73*(LL-20)) — desenhada desde LL=0
+    x_max = max(60, LL + 10)
+    xs = [0, x_max]
     ys = [LINE_A_SLOPE*(xs[0]-20), LINE_A_SLOPE*(xs[1]-20)]
     ax.plot(xs, ys)  # linha A
-    # Guias verticais solicitadas (LL=30 e LL=50)
+
+    # Guias verticais pedidas
     ax.axvline(30, linestyle='--', linewidth=1)
     ax.axvline(50, linestyle='--', linewidth=1)
-    # Rótulos discretos no topo
+
+    # Ponto (LL, IP)
+    ax.scatter([LL], [IP])
+
+    # Limites dos eixos: começar em 0 para não exibir IP negativo
+    y_line_end = LINE_A_SLOPE*(x_max - 20)
+    y_max = max(40, IP + 10, y_line_end + 5)
+    ax.set_xlim(0, x_max)
+    ax.set_ylim(0, y_max)
+
+    # Rótulos das guias após definir limites
     ylim = ax.get_ylim()
     ax.text(30, ylim[1]*0.95, "LL=30", rotation=90, va='top', ha='right', fontsize=9)
     ax.text(50, ylim[1]*0.95, "LL=50", rotation=90, va='top', ha='right', fontsize=9)
 
-    ax.scatter([LL], [IP])
     ax.set_xlabel("LL")
     ax.set_ylabel("IP")
     ax.set_title("Gráfico de Plasticidade (linha A e ponto da amostra)")
