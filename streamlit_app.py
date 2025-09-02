@@ -70,7 +70,20 @@ def build_excel_template_bytes():
     ])
     # Exporta para Excel em memória
     bio = io.BytesIO()
-    with pd.ExcelWriter(bio, engine="xlsxwriter") as writer:
+    # Escolhe engine disponível (XlsxWriter preferido; fallback openpyxl)
+    engine = None
+    try:
+        import xlsxwriter  # noqa: F401
+        engine = "xlsxwriter"
+    except Exception:
+        try:
+            import openpyxl  # noqa: F401
+            engine = "openpyxl"
+        except Exception:
+            engine = None
+    if engine is None:
+        raise RuntimeError("Nenhum engine Excel disponível. Instale XlsxWriter ou openpyxl.")
+    with pd.ExcelWriter(bio, engine=engine) as writer:
         df.to_excel(writer, index=False, sheet_name="exemplos")
     bio.seek(0)
     return bio.getvalue()
