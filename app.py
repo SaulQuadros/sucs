@@ -11,6 +11,7 @@ import re
 import uuid
 from pathlib import Path
 import json
+import unicodedata
 import pandas as pd
 import streamlit as st
 
@@ -72,6 +73,20 @@ def _ensure_session_df():
             if c not in df.columns:
                 df[c] = pd.Series([None]*len(df))
         st.session_state['trechos'] = df[BASE_COLS]
+
+def _norm_tipo(x:str)->str:
+    """Normaliza 'tipo_ini' para comparação robusta (te/tê, entrada de água, cruzeta)."""
+    s = _s(x).lower().strip()
+    # remove acentos
+    s = ''.join(ch for ch in unicodedata.normalize('NFD', s) if unicodedata.category(ch) != 'Mn')
+    s = s.replace(' ', '')
+    if 'entrada' in s:
+        return 'entrada'
+    if 'cruzeta' in s:
+        return 'cruzeta'
+    if 'te' in s:  # cobre 'tê' e 'te'
+        return 'te'
+    return s
 
 # =========================
 # Notação dos nós (A..Z, AA.. / 1..N)
@@ -193,22 +208,33 @@ tab1, tab2, tab3 = st.tabs(['Trechos', 'L_eq por DN (referencial)', 'Resultados'
 with tab1:
     st.subheader('Cadastrar trechos')
     with st.form('frm_add'):
-        c1,c2,c3,c4 = st.columns([1.2,1,1,1.2])
+        # Linha 1 – identificação
+        c1,c2,c3 = st.columns([1.2,1,1])
         id_val = c1.text_input('id (opcional)')
         ramo = c2.text_input('ramo', value='A')
         ordem = c3.number_input('ordem', min_value=1, step=1, value=1)
-        tipo_ini = c4.selectbox('Tipo da conexão no INÍCIO', ['Entrada de água','Tê','Cruzeta'])
-        c5,c6 = st.columns(2)
+
+        # Linha 2 – tipo do ponto inicial, início e fim
+        st.markdown('**Ponto inicial e final**')
+        c4, c5, c6 = st.columns([1.2, 1, 1])
+        tipo_ini = c4.selectbox('Tipo do ponto inicial (INÍCIO)',
+                                ['Entrada de Água','Tê','Cruzeta'])
         de_no_raw = c5.text_input('de_no (início)', value='A' if notacao_mode.startswith('Let') else '1')
         para_no_raw = c6.text_input('para_no (fim)', value='B' if notacao_mode.startswith('Let') else '2')
+
+        # Linha 3 – DN, comprimento, desnível
         c7,c8,c9 = st.columns(3)
         dn_mm = c7.number_input('dn_mm (mm, interno)', min_value=0.0, step=1.0, value=32.0)
         comp_real_m = c8.number_input('comp_real_m (m)', min_value=0.0, step=0.1, value=6.0, format='%.2f')
         dz_io_m = c9.number_input("dz_io_m (m) (z_inicial - z_final; desce>0, sobe<0)", step=0.1, value=0.0, format="%.2f")
-        peso_trecho = st.number_input('peso_trecho (UC)', min_value=0.0, step=1.0, value=10.0, format='%.2f')
+
+        # Linha 4 – peso e ponto final (mín. de pressão)
         c10,c11 = st.columns([1,1])
-        tipo_ponto = c10.selectbox('Tipo no final do trecho', ['Sem utilização (5 kPa)','Ponto de utilização (10 kPa)'])
-        p_min_ref_kPa = c11.number_input('p_min_ref (kPa)', min_value=0.0, step=0.5, value=(5.0 if 'Sem' in tipo_ponto else 10.0), format='%.2f')
+        peso_trecho = c10.number_input('peso_trecho (UC)', min_value=0.0, step=1.0, value=10.0, format='%.2f')
+        tipo_ponto = c11.selectbox('Tipo no final do trecho', ['Sem utilização (5 kPa)','Ponto de utilização (10 kPa)'])
+        p_min_ref_kPa = st.number_input('p_min_ref (kPa)', min_value=0.0, step=0.5,
+                                        value=(5.0 if 'Sem' in tipo_ponto else 10.0), format='%.2f')
+
         ok = st.form_submit_button("➕ Adicionar trecho", disabled=(material_sistema == "(selecione)"))
 
         if ok:
@@ -232,24 +258,25 @@ with tab1:
                     st.stop()
 
             # 3) Limite de saídas por nó de início + consistência do tipo
+            count_out = 0
             if not df.empty and {'de_no','tipo_ini'} <= set(df.columns):
                 subset = df[df['de_no'].astype(str)==de_no]
                 if not subset.empty:
-                    tipos_exist = set([_s(x) for x in subset['tipo_ini'].dropna().unique().tolist() if _s(x)])
-                    if len(tipos_exist) > 1 and _s(tipo_ini) not in tipos_exist:
-                        st.error(f'O nó "{de_no}" já está associado a tipos diferentes ({", ".join(sorted(tipos_exist))}).')
+                    # Consistência do tipo: compara em forma normalizada
+                    tipos_exist_norm = set(_norm_tipo(x) for x in subset['tipo_ini'].tolist())
+                    tipo_sel_norm = _norm_tipo(tipo_ini)
+                    if len(tipos_exist_norm) > 1 and tipo_sel_norm not in tipos_exist_norm:
+                        st.error('O nó de início já foi cadastrado com tipos diferentes. Padronize o tipo.')
                         st.stop()
-                    if len(tipos_exist) == 1 and _s(tipo_ini) not in tipos_exist:
-                        st.error(f'O nó "{de_no}" já está definido como "{list(tipos_exist)[0]}".')
+                    if len(tipos_exist_norm) == 1 and tipo_sel_norm not in tipos_exist_norm:
+                        st.error(f'O nó "{de_no}" já está definido como "{list(subset["tipo_ini"].unique())[0]}".')
                         st.stop()
                     count_out = len(subset)
-                else:
-                    count_out = 0
-            else:
-                count_out = 0
-
-            cap_map = {'Entrada de água': cap_ent, 'Tê': cap_te, 'Cruzeta': cap_crz}
-            cap_allowed = int(cap_map.get(tipo_ini, 2))
+            # Capacidades (valores da sidebar)
+            cap_map = {'entrada': int(locals().get('cap_ent', 1)),
+                       'te': int(locals().get('cap_te', 2)),
+                       'cruzeta': int(locals().get('cap_crz', 3))}
+            cap_allowed = cap_map.get(_norm_tipo(tipo_ini), 2)
             if count_out >= cap_allowed:
                 st.error(f'O nó de início "{de_no}" ({tipo_ini}) já atingiu o limite de {cap_allowed} saída(s).')
                 st.stop()
@@ -443,5 +470,4 @@ with tab3:
         st.download_button('Baixar projeto (.json)',
                            data=json.dumps(proj, ensure_ascii=False, indent=2).encode('utf-8'),
                            file_name='spaf_projeto.json', mime='application/json')
-
 
