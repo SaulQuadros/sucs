@@ -223,12 +223,12 @@ with tab1:
                 st.error('Início e fim do trecho não podem ser iguais.')
                 st.stop()
 
-            # 2) Duplicidade (mesmo ramo + de_no + para_no)
+            # 2) Duplicidade global (de_no + para_no) — independente do ramo
             df = pd.DataFrame(st.session_state['trechos']).copy()
-            if not df.empty and {'ramo','de_no','para_no'} <= set(df.columns):
-                dup = df[(df['ramo'].astype(str)==str(ramo)) & (df['de_no'].astype(str)==de_no) & (df['para_no'].astype(str)==para_no)]
+            if not df.empty and {'de_no','para_no'} <= set(df.columns):
+                dup = df[(df['de_no'].astype(str)==de_no) & (df['para_no'].astype(str)==para_no)]
                 if not dup.empty:
-                    st.error(f'Já existe um trecho {ramo}: {de_no} → {para_no}.')
+                    st.error(f'Já existe um trecho {de_no} → {para_no}.')
                     st.stop()
 
             # 3) Limite de saídas por nó de início + consistência do tipo
