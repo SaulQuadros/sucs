@@ -1,36 +1,24 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import re
-import uuid
-import json
-import unicodedata
+import re, uuid, json, unicodedata
 import pandas as pd
 import streamlit as st
 
-# ---------------------------------
-# Helpers
-# ---------------------------------
+VERSION_STAMP = "build 2025-09-04 13:42:59 • app.py"
 
 BASE_COLS = [
     'id','ramo','ordem','tipo_ini','de_no','para_no',
     'dn_mm','comp_real_m','dz_io_m','peso_trecho','p_min_ref_kPa'
 ]
-DTYPES = {
-    'id':'string','ramo':'string','ordem':'Int64','tipo_ini':'string',
-    'de_no':'string','para_no':'string',
-    'dn_mm':'float','comp_real_m':'float','dz_io_m':'float','peso_trecho':'float','p_min_ref_kPa':'float'
-}
 
-def _s(x):
-    try:
-        if pd.isna(x):
-            return ''
-    except Exception:
-        pass
-    return '' if x is None else str(x)
+def _ensure_session_df():
+    if 'trechos' not in st.session_state:
+        import pandas as pd
+        st.session_state['trechos'] = pd.DataFrame(columns=BASE_COLS)
 
 def normalize_label(value: str, mode: str) -> str:
+    import re
     if mode.startswith('Letras'):
         v = (value or '').strip().upper()
         if not re.fullmatch(r'[A-Z]+', v):
@@ -43,33 +31,19 @@ def normalize_label(value: str, mode: str) -> str:
         return str(int(v))
 
 def _norm_tipo(x:str)->str:
-    s = _s(x).lower().strip()
+    import unicodedata
+    s = (x or '').lower().strip()
     s = ''.join(ch for ch in unicodedata.normalize('NFD', s) if unicodedata.category(ch) != 'Mn')
     s = s.replace(' ', '')
-    if 'entrada' in s:
-        return 'entrada'
-    if 'cruzeta' in s:
-        return 'cruzeta'
-    if 'te' in s:
-        return 'te'
+    if 'entrada' in s: return 'entrada'
+    if 'cruzeta' in s: return 'cruzeta'
+    if 'te' in s: return 'te'
     return s
-
-def _ensure_session_df():
-    if 'trechos' not in st.session_state or not isinstance(st.session_state['trechos'], pd.DataFrame):
-        st.session_state['trechos'] = pd.DataFrame(columns=BASE_COLS)
-    else:
-        df = st.session_state['trechos']
-        for c in BASE_COLS:
-            if c not in df.columns:
-                df[c] = pd.Series([None]*len(df))
-        st.session_state['trechos'] = df[BASE_COLS]
-
-# ---------------------------------
-# App
-# ---------------------------------
 
 st.set_page_config(page_title='SPAF – Trechos', layout='wide')
 st.title('SPAF – Cadastro de Trechos (Entrada, Tê, Cruzeta)')
+st.caption(VERSION_STAMP)
+
 _ensure_session_df()
 
 with st.sidebar:
@@ -93,10 +67,10 @@ with tab1:
         ramo = c2.text_input('ramo', value='A')
         ordem = c3.number_input('ordem', min_value=1, step=1, value=1)
 
-        # ---- Linha exclusiva para o seletor que você pediu ----
-        tipo_ini = st.selectbox('Tipo da conexão no INÍCIO (obrigatório)',
-                                ['Entrada de Água','Tê','Cruzeta'],
-                                key='tipo_da_conexao_no_inicio')
+        # Linha exclusiva e destacada
+        st.markdown('### Tipo da conexão no INÍCIO')
+        tipo_ini = st.selectbox('Selecione o tipo do ponto inicial:', ['Entrada de Água','Tê','Cruzeta'], key='tipo_ini_select')
+        st.caption('Seletor obrigatório — se não estiver vendo este campo, o arquivo carregado não é esta versão.')
 
         c5, c6 = st.columns(2)
         de_no_raw = c5.text_input('de_no (início)', value='A' if notacao_mode.startswith('Let') else '1')
@@ -116,7 +90,6 @@ with tab1:
         ok = st.form_submit_button("➕ Adicionar trecho")
 
         if ok:
-            # 1) Notação dos nós
             try:
                 de_no = normalize_label(de_no_raw, notacao_mode)
                 para_no = normalize_label(para_no_raw, notacao_mode)
@@ -124,82 +97,48 @@ with tab1:
                 st.error(f'Erro na notação dos nós: {e}')
                 st.stop()
             if de_no == para_no:
-                st.error('Início e fim do trecho não podem ser iguais.')
-                st.stop()
+                st.error('Início e fim do trecho não podem ser iguais.'); st.stop()
 
-            df = pd.DataFrame(st.session_state['trechos']).copy()
+            df = st.session_state['trechos'].copy()
 
-            # 2) Duplicidade global (de_no + para_no) — independente do ramo
-            if not df.empty and {'de_no','para_no'} <= set(df.columns):
+            # duplicidade global
+            if not df.empty and set(['de_no','para_no']).issubset(df.columns):
                 dup = df[(df['de_no'].astype(str)==de_no) & (df['para_no'].astype(str)==para_no)]
                 if not dup.empty:
-                    st.error(f'Já existe um trecho {de_no} → {para_no}. Não é permitido duplicar essa ligação.')
-                    st.stop()
+                    st.error(f'Já existe um trecho {de_no} → {para_no}.'); st.stop()
 
-            # 3) Limite de saídas por nó de início + consistência de tipo
-            count_out = 0
-            if not df.empty and {'de_no','tipo_ini'} <= set(df.columns):
-                subset = df[df['de_no'].astype(str)==de_no]
-                if not subset.empty:
-                    tipos_exist_norm = set(_norm_tipo(x) for x in subset['tipo_ini'].tolist())
-                    tipo_sel_norm = _norm_tipo(tipo_ini)
-                    if len(tipos_exist_norm) > 1 and tipo_sel_norm not in tipos_exist_norm:
-                        st.error('O nó de início já foi cadastrado com tipos diferentes. Padronize o tipo.')
-                        st.stop()
-                    if len(tipos_exist_norm) == 1 and tipo_sel_norm not in tipos_exist_norm:
-                        st.error(f'O nó "{de_no}" já está definido como "{list(subset["tipo_ini"].unique())[0]}".')
-                        st.stop()
-                    count_out = len(subset)
+            # capacidade por tipo
+            tipo_norm = _norm_tipo(tipo_ini)
+            cap_map = {'entrada': int(st.session_state.get('cap_ent',1)),
+                        'te': int(st.session_state.get('cap_te',2)),
+                        'cruzeta': int(st.session_state.get('cap_crz',3))}
+            cap_allowed = cap_map.get(tipo_norm, 2)
+            subset = df[df['de_no'].astype(str)==de_no] if not df.empty else df
+            if not subset.empty and len(subset) >= cap_allowed:
+                st.error(f'O nó de início "{de_no}" ({tipo_ini}) já atingiu o limite de {cap_allowed} saída(s).'); st.stop()
 
-            cap_map = {'entrada': int(st.session_state.get('cap_ent', 1)),
-                       'te': int(st.session_state.get('cap_te', 2)),
-                       'cruzeta': int(st.session_state.get('cap_crz', 3))}
-            cap_allowed = cap_map.get(_norm_tipo(tipo_ini), 2)
-            if count_out >= cap_allowed:
-                st.error(f'O nó de início "{de_no}" ({tipo_ini}) já atingiu o limite de {cap_allowed} saída(s).')
-                st.stop()
-
-            # 4) Monta nova linha (ID único)
-            base_exist = pd.DataFrame(st.session_state['trechos'])
-            existing_ids = set(
-                base_exist.get('id', pd.Series([], dtype=str)).astype(str).fillna('').str.strip().tolist()
-            )
-            raw_id = (id_val or '').strip()
-            if (not raw_id) or (raw_id in existing_ids):
-                base_tag = raw_id if raw_id else 'row'
-                raw_id = f"{base_tag}_{uuid.uuid4().hex[:6]}"
-
-            nova = {
-                'id': raw_id,'ramo':ramo,'ordem':int(ordem),'tipo_ini':tipo_ini,
-                'de_no':de_no,'para_no':para_no,
-                'dn_mm':float(dn_mm),'comp_real_m':float(comp_real_m),
-                'dz_io_m':float(dz_io_m),'peso_trecho':float(peso_trecho),
-                'p_min_ref_kPa':float(p_min_ref_kPa)
-            }
-
-            base = pd.concat([df, pd.DataFrame([nova])], ignore_index=True)
-            for c,t in DTYPES.items():
-                try: base[c] = base[c].astype(t)
-                except Exception: pass
-            st.session_state['trechos'] = base[BASE_COLS]
+            # inserir
+            rid = (id_val or '').strip()
+            if not rid:
+                rid = f"row_{uuid.uuid4().hex[:6]}"
+            new = pd.DataFrame([{
+                'id': rid, 'ramo':ramo, 'ordem':int(ordem), 'tipo_ini':tipo_ini,
+                'de_no':de_no, 'para_no':para_no, 'dn_mm':float(dn_mm),
+                'comp_real_m':float(comp_real_m), 'dz_io_m':float(dz_io_m),
+                'peso_trecho':float(peso_trecho), 'p_min_ref_kPa':float(p_min_ref_kPa)
+            }])
+            st.session_state['trechos'] = pd.concat([df, new], ignore_index=True)
             st.success(f'Trecho adicionado: {ramo}: {de_no} → {para_no} ({tipo_ini}).')
 
-    st.dataframe(pd.DataFrame(st.session_state['trechos'])[BASE_COLS], use_container_width=True, height=360)
+    st.dataframe(st.session_state['trechos'][BASE_COLS], use_container_width=True, height=360)
 
 with tab2:
     st.subheader('Prévia de resultados / exportação')
-    base = pd.DataFrame(st.session_state['trechos']).copy()
+    base = st.session_state['trechos']
     if base.empty:
         st.info('Cadastre trechos na aba 1.')
     else:
-        params = {
-            'projeto': projeto_nome,
-            'capacidade': {'entrada': int(st.session_state.get('cap_ent',1)),
-                           'te': int(st.session_state.get('cap_te',2)),
-                           'cruzeta': int(st.session_state.get('cap_crz',3))}
-        }
-        show_cols = [c for c in BASE_COLS if c in base.columns]
-        proj = {'params': params, 'trechos': base[show_cols].to_dict(orient='list')}
+        proj = {'params': {}, 'trechos': base.to_dict(orient='list')}
         st.download_button('Baixar projeto (.json)',
                            data=json.dumps(proj, ensure_ascii=False, indent=2).encode('utf-8'),
                            file_name='spaf_projeto.json', mime='application/json')
