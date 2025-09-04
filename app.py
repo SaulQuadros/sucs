@@ -5,14 +5,12 @@ import re
 import uuid
 import json
 import unicodedata
-from pathlib import Path
-
 import pandas as pd
 import streamlit as st
 
-# =========================
+# ---------------------------------
 # Helpers
-# =========================
+# ---------------------------------
 
 BASE_COLS = [
     'id','ramo','ordem','tipo_ini','de_no','para_no',
@@ -32,32 +30,19 @@ def _s(x):
         pass
     return '' if x is None else str(x)
 
-def _num(x, default=0.0):
-    try:
-        if pd.isna(x):
-            return default
-    except Exception:
-        pass
-    try:
-        return float(str(x).replace(',', '.'))
-    except Exception:
-        return default
-
 def normalize_label(value: str, mode: str) -> str:
-    """Limpa/valida rótulos conforme o modo escolhido."""
     if mode.startswith('Letras'):
         v = (value or '').strip().upper()
         if not re.fullmatch(r'[A-Z]+', v):
             raise ValueError('Use apenas letras maiúsculas (A–Z, AA, AB, ...).')
         return v
-    else:  # Números
+    else:
         v = (value or '').strip()
         if not re.fullmatch(r'[0-9]+', v):
             raise ValueError('Use apenas dígitos (0–9).')
         return str(int(v))
 
 def _norm_tipo(x:str)->str:
-    """Normaliza 'tipo_ini' para comparação robusta (tê/te, entrada de água, cruzeta)."""
     s = _s(x).lower().strip()
     s = ''.join(ch for ch in unicodedata.normalize('NFD', s) if unicodedata.category(ch) != 'Mn')
     s = s.replace(' ', '')
@@ -65,7 +50,7 @@ def _norm_tipo(x:str)->str:
         return 'entrada'
     if 'cruzeta' in s:
         return 'cruzeta'
-    if 'te' in s:  # cobre 'tê' e 'te'
+    if 'te' in s:
         return 'te'
     return s
 
@@ -79,64 +64,49 @@ def _ensure_session_df():
                 df[c] = pd.Series([None]*len(df))
         st.session_state['trechos'] = df[BASE_COLS]
 
-def _st_rerun():
-    if hasattr(st, 'rerun'):
-        st.rerun()
-    elif hasattr(st, 'experimental_rerun'):
-        st.experimental_rerun()
-
-def trecho_label(r):
-    return f"{_s(r.get('ramo'))}-{_s(r.get('ordem'))} [{_s(r.get('de_no'))}→{_s(r.get('para_no'))}] ({_s(r.get('tipo_ini'))})"
-
-# =========================
+# ---------------------------------
 # App
-# =========================
+# ---------------------------------
 
 st.set_page_config(page_title='SPAF – Trechos', layout='wide')
 st.title('SPAF – Cadastro de Trechos (Entrada, Tê, Cruzeta)')
-
 _ensure_session_df()
 
-# Sidebar
 with st.sidebar:
     st.header('Parâmetros Globais')
     projeto_nome = st.text_input('Nome do Projeto', 'Projeto Genérico')
     st.markdown('---')
-    st.subheader('Notação dos nós (início/fim)')
     notacao_mode = st.radio('Modo de notação', ['Letras (A, B, ..., Z, AA, AB, ...)', 'Números (1, 2, 3, ...)'], index=0)
-    st.caption('A validação garante que os rótulos dos nós respeitem o modo escolhido.')
     st.markdown('---')
-    st.subheader('Capacidade por tipo de conexão (saídas permitidas por nó de início)')
-    cap_ent = st.number_input('Entrada de água – máx. saídas', min_value=1, max_value=10, value=1, step=1)
-    cap_te  = st.number_input('Tê – máx. saídas', min_value=1, max_value=10, value=2, step=1)
-    cap_crz = st.number_input('Cruzeta – máx. saídas', min_value=1, max_value=10, value=3, step=1)
+    st.subheader('Capacidade por tipo de conexão')
+    cap_ent = st.number_input('Entrada de água – máx. saídas', min_value=1, max_value=10, value=1, step=1, key='cap_ent')
+    cap_te  = st.number_input('Tê – máx. saídas', min_value=1, max_value=10, value=2, step=1, key='cap_te')
+    cap_crz = st.number_input('Cruzeta – máx. saídas', min_value=1, max_value=10, value=3, step=1, key='cap_crz')
 
 tab1, tab2 = st.tabs(['Trechos', 'Resultados (prévia)'])
 
-# ---------------- TAB 1: Cadastro ----------------
 with tab1:
     st.subheader('Cadastrar trechos')
     with st.form('frm_add'):
-        # Linha 1 – identificação
         c1,c2,c3 = st.columns([1.2,1,1])
         id_val = c1.text_input('id (opcional)')
         ramo = c2.text_input('ramo', value='A')
         ordem = c3.number_input('ordem', min_value=1, step=1, value=1)
 
-        # Linha 2 – tipo do ponto inicial, início e fim
-        st.markdown('**Ponto inicial e final**')
-        c4, c5, c6 = st.columns([1.4, 1, 1])
-        tipo_ini = c4.selectbox('Tipo da conexão no INÍCIO', ['Entrada de Água','Tê','Cruzeta'])
+        # ---- Linha exclusiva para o seletor que você pediu ----
+        tipo_ini = st.selectbox('Tipo da conexão no INÍCIO (obrigatório)',
+                                ['Entrada de Água','Tê','Cruzeta'],
+                                key='tipo_da_conexao_no_inicio')
+
+        c5, c6 = st.columns(2)
         de_no_raw = c5.text_input('de_no (início)', value='A' if notacao_mode.startswith('Let') else '1')
         para_no_raw = c6.text_input('para_no (fim)', value='B' if notacao_mode.startswith('Let') else '2')
 
-        # Linha 3 – DN, comprimento, desnível
         c7,c8,c9 = st.columns(3)
         dn_mm = c7.number_input('dn_mm (mm, interno)', min_value=0.0, step=1.0, value=32.0)
         comp_real_m = c8.number_input('comp_real_m (m)', min_value=0.0, step=0.1, value=6.0, format='%.2f')
         dz_io_m = c9.number_input("dz_io_m (m) (z_inicial - z_final; desce>0, sobe<0)", step=0.1, value=0.0, format="%.2f")
 
-        # Linha 4 – peso e ponto final (mín. de pressão)
         c10,c11 = st.columns([1,1])
         peso_trecho = c10.number_input('peso_trecho (UC)', min_value=0.0, step=1.0, value=10.0, format='%.2f')
         tipo_ponto = c11.selectbox('Tipo do ponto no final do trecho', ['Sem utilização (5 kPa)','Ponto de utilização (10 kPa)'])
@@ -181,7 +151,9 @@ with tab1:
                         st.stop()
                     count_out = len(subset)
 
-            cap_map = {'entrada': int(cap_ent), 'te': int(cap_te), 'cruzeta': int(cap_crz)}
+            cap_map = {'entrada': int(st.session_state.get('cap_ent', 1)),
+                       'te': int(st.session_state.get('cap_te', 2)),
+                       'cruzeta': int(st.session_state.get('cap_crz', 3))}
             cap_allowed = cap_map.get(_norm_tipo(tipo_ini), 2)
             if count_out >= cap_allowed:
                 st.error(f'O nó de início "{de_no}" ({tipo_ini}) já atingiu o limite de {cap_allowed} saída(s).')
@@ -212,10 +184,8 @@ with tab1:
             st.session_state['trechos'] = base[BASE_COLS]
             st.success(f'Trecho adicionado: {ramo}: {de_no} → {para_no} ({tipo_ini}).')
 
-    # Tabela
     st.dataframe(pd.DataFrame(st.session_state['trechos'])[BASE_COLS], use_container_width=True, height=360)
 
-# ---------------- TAB 2: Resultados (prévia) ----------------
 with tab2:
     st.subheader('Prévia de resultados / exportação')
     base = pd.DataFrame(st.session_state['trechos']).copy()
@@ -224,7 +194,9 @@ with tab2:
     else:
         params = {
             'projeto': projeto_nome,
-            'capacidade': {'entrada': int(cap_ent), 'te': int(cap_te), 'cruzeta': int(cap_crz)}
+            'capacidade': {'entrada': int(st.session_state.get('cap_ent',1)),
+                           'te': int(st.session_state.get('cap_te',2)),
+                           'cruzeta': int(st.session_state.get('cap_crz',3))}
         }
         show_cols = [c for c in BASE_COLS if c in base.columns]
         proj = {'params': params, 'trechos': base[show_cols].to_dict(orient='list')}
