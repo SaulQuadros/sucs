@@ -1,4 +1,16 @@
 projeto,tecnico,amostra,pct_retido_200,pct_pedregulho_coarse,pct_areia_coarse,LL,LP,Cu,Cc,organico,turfa
-Rodovia X,Maria Silva,AX-01,70,60,40,35,22,8,2.0,False,False
-Rodovia Y,João Souza,BY-07,80,30,70,28,20,5,1.2,False,False
-Ramal Z,Ana Lima,CZ-03,35,0,0,60,28,,,True,False
+Demo,Equipe,,97,70,30,25,20,8.0,2.0,False,False
+Demo,Equipe,,96,60,40,25,20,2.0,0.6,False,False
+Demo,Equipe,,75,60,40,40,27,,,False,False
+Demo,Equipe,,75,60,40,40,20,,,False,False
+Demo,Equipe,,97,30,70,25,20,7.0,1.5,False,False
+Demo,Equipe,,96,30,70,25,20,3.0,0.8,False,False
+Demo,Equipe,,75,30,70,40,27,,,False,False
+Demo,Equipe,,75,30,70,40,20,,,False,False
+Demo,Equipe,,30,0,0,35,25,,,False,False
+Demo,Equipe,,30,0,0,35,22,,,False,False
+Demo,Equipe,,30,0,0,35,20,,,True,False
+Demo,Equipe,,30,0,0,70,40,,,False,False
+Demo,Equipe,,30,0,0,70,25,,,False,False
+Demo,Equipe,,30,0,0,60,30,,,True,False
+Demo,Equipe,,10,0,0,150,50,,,True,True
