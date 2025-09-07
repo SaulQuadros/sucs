@@ -7,6 +7,7 @@ from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
+# === Barra lateral (padrão SUCS) ===
 with st.sidebar:
     st.header("Projeto")
     projeto = st.text_input("Nome do projeto")
@@ -40,11 +41,12 @@ def build_excel_template_bytes_trb():
     ]
     rows = []
     for g, desc, params in exemplos:
-        row = dict(Projeto="", Nome="", **{"Técnico Responsável":""}, **{"Código da Amostra":""},
+        row = dict(**{"Nome do projeto":""}, **{"Técnico responsável":""}, **{"Código da amostra":""},
                    Grupo_esperado=g, descricao_sintetica=desc)
         row.update(params)
         rows.append(row)
-    df = pd.DataFrame(rows, columns=["Nome do projeto","Técnico responsável","Código da amostra",
+    df = pd.DataFrame(rows, columns=[
+        "Nome do projeto","Técnico responsável","Código da amostra",
         "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
     ])
     mem = io.BytesIO()
@@ -125,16 +127,14 @@ with col1:
             st.caption(f"Comportamento como subleito: **{r.subleito}**")
             if r.aviso_ig:
                 st.warning(r.aviso_ig)
-            # Relatório com cabeçalho de identificação
-            meta_hdr = (f"Nome do projeto: {projeto or '-'}
-"            f"Técnico responsável: {tecnico or '-'}
-"            f"Código da amostra: {amostra or '-'}
-
-")
+            # Cabeçalho de identificação (padrão SUCS)
+            meta_hdr = (f"Nome do projeto: {projeto or '-'}\n"
+                        f"Técnico responsável: {tecnico or '-'}\n"
+                        f"Código da amostra: {amostra or '-'}\n\n")
             rel = meta_hdr + r.relatorio
             st.text_area("Relatório (texto)", rel, height=300)
             mem = io.BytesIO(rel.encode("utf-8"))
-            fname = f"TRB_{(meta_codigo or 'amostra').replace(' ', '_')}.txt"
+            fname = f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt"
             st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
         except Exception as e:
             st.error(str(e))
