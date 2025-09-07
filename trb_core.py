@@ -3,11 +3,32 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
+GROUP_DESC = {
+    "A-1-a": "Granular de alta qualidade; excelente a bom como subleito.",
+    "A-1-b": "Granular bem graduado; geralmente bom como subleito.",
+    "A-3":   "Areia fina não plástica; sensível à umidade; bom a regular.",
+    "A-2-4": "Granular com finos siltosos (LL≤40); regular a bom.",
+    "A-2-5": "Granular com finos siltosos (LL>40); regular.",
+    "A-2-6": "Granular com finos argilosos (LL≤40); regular a sofrível.",
+    "A-2-7": "Granular com finos argilosos (LL>40); sofrível.",
+    "A-4":   "Silte de LL baixo; regular a sofrível.",
+    "A-5":   "Silte de LL alto; sofrível a mau.",
+    "A-6":   "Argila de LL baixo; sofrível a mau.",
+    "A-7-5": "Argila de LL alto (menos plástica); mau como subleito.",
+    "A-7-6": "Argila de LL alto (mais plástica); mau como subleito.",
+}
+
+def ig_label(ig: int) -> str:
+    if ig <= 3:     return "IG baixo (melhor desempenho)"
+    if ig <= 9:     return "IG moderado"
+    return "IG alto (atenção: baixo desempenho)"
+
 @dataclass
 class TRBResult:
     group: str
     ig: int
     rationale: List[str]
+    relatorio: str
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
@@ -20,6 +41,32 @@ def group_index(p200: float, ll: float, ip: float) -> int:
     ig = 0.2*a + 0.005*a*c + 0.01*b*d
     ig_i = int(round(max(0.0, min(20.0, ig))))
     return ig_i
+
+def _build_relatorio(group: str, ig: int, rationale: List[str], p10: float, p40: float, p200: float, ll: float, ip: float, is_np: bool) -> str:
+    linhas = []
+    linhas.append("=== Classificação TRB (HRB/AASHTO) ===")
+    linhas.append(f"Grupo: {group}")
+    linhas.append(f"Índice de Grupo (IG): {ig} — {ig_label(ig)}")
+    linhas.append("")
+    linhas.append("Entradas:")
+    linhas.append(f"  % passante #10 = {p10:.2f}%")
+    linhas.append(f"  % passante #40 = {p40:.2f}%")
+    linhas.append(f"  % passante #200 = {p200:.2f}%")
+    if is_np:
+        linhas.append(f"  IP = NP (não-plástico)")
+        linhas.append(f"  LL (ignorado por NP)")
+    else:
+        linhas.append(f"  LL = {ll:.2f}")
+        linhas.append(f"  IP = {ip:.2f}")
+    linhas.append("")
+    linhas.append("Regras acionadas:")
+    for r in rationale:
+        linhas.append(f"  • {r}")
+    linhas.append("")
+    desc = GROUP_DESC.get(group, "—")
+    linhas.append(f"Interpretação TRB: {desc}")
+    linhas.append("Observação: O IG não define o grupo; apenas qualifica o desempenho do subleito (quanto menor, melhor).")
+    return "\n".join(linhas)
 
 def classify_trb(p10: float, p40: float, p200: float, ll: float, ip: float, is_np: bool=False) -> TRBResult:
     R: List[str] = []
@@ -58,7 +105,8 @@ def classify_trb(p10: float, p40: float, p200: float, ll: float, ip: float, is_n
             else:
                 g = "A-7-6"; R.append("LL>40, IP≥11 e IP > LL−30")
     ig = group_index(p200, ll, ip)
-    return TRBResult(group=g, ig=ig, rationale=R)
+    relatorio = _build_relatorio(g, ig, R, p10, p40, p200, ll, ip, is_np)
+    return TRBResult(group=g, ig=ig, rationale=R, relatorio=relatorio)
 
 def classify_dataframe_trb(df, cols_map: Optional[dict]=None):
     import pandas as pd
@@ -72,11 +120,9 @@ def classify_dataframe_trb(df, cols_map: Optional[dict]=None):
         p200 = float(row.get(c['P200'], 0))
         np_  = bool(row.get(c['NP'], False))
         if np_:
-            ll = 0.0
-            ip = 0.0
+            ll = 0.0; ip = 0.0
         else:
-            ll = float(row.get(c['LL'], 0))
-            ip = float(row.get(c['IP'], 0))
+            ll = float(row.get(c['LL'], 0)); ip = float(row.get(c['IP'], 0))
         r = classify_trb(p10, p40, p200, ll, ip, is_np=np_)
-        out.append({**row, 'Grupo_TRB': r.group, 'IG': r.ig})
+        out.append({**row, 'Grupo_TRB': r.group, 'IG': r.ig, 'relatorio': r.relatorio})
     return pd.DataFrame(out)
