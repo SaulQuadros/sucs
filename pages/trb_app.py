@@ -1,71 +1,112 @@
-
-# TRB
+# pages/trb_app.py
 import io
 import pandas as pd
 import streamlit as st
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 
-st.set_page_config(page_title="TRB", layout="wide")
+st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
-# === Barra lateral — padrão SUCS ===
+# === Barra lateral (padrão SUCS) ===
 with st.sidebar:
     st.header("Projeto")
     projeto = st.text_input("Nome do projeto")
     tecnico = st.text_input("Técnico responsável")
     amostra = st.text_input("Código da amostra")
 
-    # Planilha‑modelo (na barra lateral, como no SUCS)
-    def build_excel_template_bytes_trb():
-        exemplos = [
-            ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
-            ("A-1-b", "Granular bom",               dict(P10=70, P40=45, P200=20, LL=35, LP=29, NP=False)),
-            ("A-3",   "Areia fina NP",              dict(P10=95, P40=80, P200=8,  LL=0,  LP=0,  NP=True)),
-            ("A-2-4", "Granular c/ silte (LL≤40)",  dict(P10=85, P40=60, P200=30, LL=35, LP=27, NP=False)),
-            ("A-2-5", "Granular c/ silte (LL>40)",  dict(P10=85, P40=60, P200=30, LL=45, LP=37, NP=False)),
-            ("A-2-6", "Granular c/ argila (LL≤40)", dict(P10=85, P40=60, P200=30, LL=35, LP=23, NP=False)),
-            ("A-2-7", "Granular c/ argila (LL>40)", dict(P10=85, P40=60, P200=30, LL=45, LP=33, NP=False)),
-            ("A-4",   "Silte LL baixo",             dict(P10=80, P40=60, P200=50, LL=35, LP=27, NP=False)),
-            ("A-5",   "Silte LL alto",              dict(P10=80, P40=60, P200=50, LL=50, LP=40, NP=False)),
-            ("A-6",   "Argila LL baixo",            dict(P10=80, P40=60, P200=50, LL=35, LP=22, NP=False)),
-            ("A-7-5", "Argila LL alto menos plást.",dict(P10=90, P40=70, P200=60, LL=55, LP=35, NP=False)),
-            ("A-7-6", "Argila LL alto mais plást.", dict(P10=90, P40=70, P200=60, LL=55, LP=25, NP=False)),
-        ]
-        rows = []
-        for g, desc, params in exemplos:
-            row = dict(**{"Nome do projeto":""}, **{"Técnico responsável":""}, **{"Código da amostra":""},
-                       Grupo_esperado=g, descricao_sintetica=desc)
-            row.update(params)
-            rows.append(row)
-        df = pd.DataFrame(rows, columns=[
-            "Nome do projeto","Técnico responsável","Código da amostra",
-            "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
-        ])
-        mem = io.BytesIO()
-        try:
-            with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
-                df.to_excel(xw, index=False, sheet_name="modelo_trb")
-        except Exception:
-            with pd.ExcelWriter(mem, engine="openpyxl") as xw:
-                df.to_excel(xw, index=False, sheet_name="modelo_trb")
-        mem.seek(0)
-        return mem
-
-    xlsx_buf = build_excel_template_bytes_trb()
-    st.download_button("Baixar planilha-modelo (Excel)", data=xlsx_buf,
-                       file_name="modelo_trb.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
-    # CSV a partir do mesmo modelo
-    try:
-        df_tmp = pd.read_excel(xlsx_buf)
-        csv_mem = io.BytesIO(); df_tmp.to_csv(csv_mem, index=False, encoding="utf-8"); csv_mem.seek(0)
-        st.download_button("Baixar planilha-modelo (CSV)", data=csv_mem,
-                           file_name="modelo_trb.csv", mime="text/csv")
-    except Exception:
-        pass
+with st.expander("ℹ️ Ajuda rápida", expanded=False):
+    st.markdown(
+        "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB.\n"
+        "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). Não decide o grupo; apenas qualifica.\n"
+        "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.\n"
+        "- Use **NP** quando o solo for **não-plástico** (IP=0); nesse caso o LL e o LP são ignorados."
+    )
 
 col1, col2 = st.columns([2, 1])
+
+def build_excel_template_bytes_trb():
+    exemplos = [
+        ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
+        ("A-1-b", "Granular bom",               dict(P10=70, P40=45, P200=20, LL=35, LP=29, NP=False)),
+        ("A-3",   "Areia fina NP",              dict(P10=95, P40=80, P200=8,  LL=0,  LP=0,  NP=True)),
+        ("A-2-4", "Granular c/ silte (LL≤40)",  dict(P10=85, P40=60, P200=30, LL=35, LP=27, NP=False)),
+        ("A-2-5", "Granular c/ silte (LL>40)",  dict(P10=85, P40=60, P200=30, LL=45, LP=37, NP=False)),
+        ("A-2-6", "Granular c/ argila (LL≤40)", dict(P10=85, P40=60, P200=30, LL=35, LP=23, NP=False)),
+        ("A-2-7", "Granular c/ argila (LL>40)", dict(P10=85, P40=60, P200=30, LL=45, LP=33, NP=False)),
+        ("A-4",   "Silte LL baixo",             dict(P10=80, P40=60, P200=50, LL=35, LP=27, NP=False)),
+        ("A-5",   "Silte LL alto",              dict(P10=80, P40=60, P200=50, LL=50, LP=40, NP=False)),
+        ("A-6",   "Argila LL baixo",            dict(P10=80, P40=60, P200=50, LL=35, LP=22, NP=False)),
+        ("A-7-5", "Argila LL alto menos plást.",dict(P10=90, P40=70, P200=60, LL=55, LP=35, NP=False)),
+        ("A-7-6", "Argila LL alto mais plást.", dict(P10=90, P40=70, P200=60, LL=55, LP=25, NP=False)),
+    ]
+    rows = []
+    for g, desc, params in exemplos:
+        row = dict(**{"Nome do projeto":""}, **{"Técnico responsável":""}, **{"Código da amostra":""},
+                   Grupo_esperado=g, descricao_sintetica=desc)
+        row.update(params)
+        rows.append(row)
+    df = pd.DataFrame(rows, columns=[
+        "Nome do projeto","Técnico responsável","Código da amostra",
+        "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
+    ])
+    mem = io.BytesIO()
+    try:
+        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+            df.to_excel(xw, index=False, sheet_name="modelo_trb")
+    except Exception:
+        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+            df.to_excel(xw, index=False, sheet_name="modelo_trb")
+    mem.seek(0)
+    return mem
+
+def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
+    preferred = ["Nome do projeto","Técnico responsável","Código da amostra",
+                 "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","Materiais constituintes","aviso_ig","relatorio"]
+    cols = [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
+    df = df[cols]
+    mem = io.BytesIO()
+    try:
+        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+            df.to_excel(xw, index=False, sheet_name="Resultados")
+            wb = xw.book
+            ws = xw.sheets["Resultados"]
+            wrap = wb.add_format({"text_wrap": True, "valign": "top"})
+            hdr  = wb.add_format({"bold": True, "bg_color": "#F2F2F2"})
+            warn = wb.add_format({"bg_color": "#FFF3CD"})
+            ws.set_row(0, None, hdr)
+            width_map = {
+                "Nome do projeto":20, "Técnico responsável":22, "Código da amostra":18,
+                "P10":10, "P40":10, "P200":10, "LL":8, "LP":8, "IP_calc":9,
+                "Grupo_TRB":12, "IG":6, "Subleito":18, "Materiais constituintes":26, "aviso_ig":48, "relatorio":96
+            }
+            for idx, col in enumerate(df.columns, start=1):
+                w = width_map.get(col, 12)
+                ws.set_column(idx-1, idx-1, w, wrap if col in ("relatorio","aviso_ig") else None)
+            ws.freeze_panes(1, 0)
+            ws.autofilter(0, 0, len(df), len(df.columns)-1)
+            if "aviso_ig" in df.columns:
+                col_idx = df.columns.get_loc("aviso_ig")
+                ws.conditional_format(1, col_idx, len(df), col_idx, {
+                    "type": "text", "criteria": "not containing", "value": "", "format": warn
+                })
+            if "Grupo_TRB" in df.columns and "IG" in df.columns:
+                res = (
+                    df.groupby("Grupo_TRB")["IG"]
+                      .agg(["count","min","max","mean"])
+                      .sort_index()
+                      .rename(columns={"count":"n","min":"IG_min","max":"IG_max","mean":"IG_médio"})
+                )
+                res.to_excel(xw, index=True, sheet_name="Resumo")
+                ws2 = xw.sheets["Resumo"]
+                ws2.set_row(0, None, hdr)
+                ws2.set_column(0, 0, 14)
+                for c in range(1, 5):
+                    ws2.set_column(c, c, 12)
+    except Exception:
+        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+            df.to_excel(xw, index=False, sheet_name="Resultados")
+    mem.seek(0)
+    return mem
 
 with col1:
     st.subheader("Entrada (Formulário)")
@@ -86,6 +127,7 @@ with col1:
             st.caption(f"Comportamento como subleito: **{r.subleito}**")
             if r.aviso_ig:
                 st.warning(r.aviso_ig)
+            # Cabeçalho de identificação (padrão SUCS)
             meta_hdr = (f"Nome do projeto: {projeto or '-'}\n"
                         f"Técnico responsável: {tecnico or '-'}\n"
                         f"Código da amostra: {amostra or '-'}\n\n")
@@ -99,6 +141,23 @@ with col1:
 
 with col2:
     st.subheader("Lote (CSV / Excel)")
+    modelo_csv = pd.DataFrame([
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
+    ])
+    csv_buf = io.BytesIO(); modelo_csv.to_csv(csv_buf, index=False, encoding="utf-8"); csv_buf.seek(0)
+    st.download_button("Baixar planilha-modelo (CSV)", data=csv_buf, file_name="modelo_trb.csv", mime="text/csv")
+
+    xlsx_buf = build_excel_template_bytes_trb()
+    st.download_button("Baixar planilha-modelo (Excel)", data=xlsx_buf, file_name="modelo_trb.xlsx",
+                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
     up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv","xlsx"])
     if up is not None:
         try:
@@ -111,13 +170,13 @@ with col2:
                 up.seek(0)
                 df = pd.read_csv(up, sep=sep, encoding='utf-8-sig')
 
+            # Normaliza NP e injeta metadados da sidebar se não vierem
             if 'NP' in df.columns:
                 df['NP'] = df['NP'].astype(str).str.strip().str.lower().map({
                     'true': True, 'false': False, '1': True, '0': False,
                     'sim': True, 'não': False, 'nao': False, 'np': True
                 }).fillna(False)
 
-            # Injeta metadados da sidebar se ausentes
             for col, val in {"Nome do projeto": projeto, "Técnico responsável": tecnico, "Código da amostra": amostra}.items():
                 if col not in df.columns and val:
                     df[col] = val
@@ -125,54 +184,11 @@ with col2:
             out = classify_dataframe_trb(df)
             st.dataframe(out, use_container_width=True)
 
-            # XLSX + CSV de resultados
-            def build_results_xlsx_trb(df_res: pd.DataFrame) -> io.BytesIO:
-                preferred = ["Nome do projeto","Técnico responsável","Código da amostra",
-                             "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG",
-                             "Subleito","Materiais constituintes","aviso_ig","relatorio"]
-                cols = [c for c in preferred if c in df_res.columns] + [c for c in df_res.columns if c not in preferred]
-                df_res = df_res[cols]
-                memx = io.BytesIO()
-                try:
-                    with pd.ExcelWriter(memx, engine="xlsxwriter") as xw:
-                        df_res.to_excel(xw, index=False, sheet_name="Resultados")
-                        wb = xw.book; ws = xw.sheets["Resultados"]
-                        wrap = wb.add_format({"text_wrap": True, "valign": "top"})
-                        hdr  = wb.add_format({"bold": True, "bg_color": "#F2F2F2"})
-                        warn = wb.add_format({"bg_color": "#FFF3CD"})
-                        ws.set_row(0, None, hdr)
-                        width_map = {"Nome do projeto":20, "Técnico responsável":22, "Código da amostra":18,
-                                     "P10":10,"P40":10,"P200":10,"LL":8,"LP":8,"IP_calc":9,
-                                     "Grupo_TRB":12,"IG":6,"Subleito":18,"Materiais constituintes":26,
-                                     "aviso_ig":48,"relatorio":96}
-                        for idx, col in enumerate(df_res.columns, start=1):
-                            w = width_map.get(col, 12)
-                            ws.set_column(idx-1, idx-1, w, wrap if col in ("relatorio","aviso_ig") else None)
-                        ws.freeze_panes(1,0)
-                        ws.autofilter(0,0, len(df_res), len(df_res.columns)-1)
-                        if "aviso_ig" in df_res.columns:
-                            col_idx = df_res.columns.get_loc("aviso_ig")
-                            ws.conditional_format(1, col_idx, len(df_res), col_idx, {
-                                "type": "text", "criteria": "not containing", "value": "", "format": warn
-                            })
-                        if "Grupo_TRB" in df_res.columns and "IG" in df_res.columns:
-                            res = (df_res.groupby("Grupo_TRB")["IG"]
-                                    .agg(["count","min","max","mean"]).sort_index()
-                                    .rename(columns={"count":"n","min":"IG_min","max":"IG_max","mean":"IG_médio"}))
-                            res.to_excel(xw, index=True, sheet_name="Resumo")
-                            ws2 = xw.sheets["Resumo"]; ws2.set_row(0, None, hdr)
-                            ws2.set_column(0,0,14)
-                            for c in range(1,5): ws2.set_column(c,c,12)
-                except Exception:
-                    with pd.ExcelWriter(memx, engine="openpyxl") as xw:
-                        df_res.to_excel(xw, index=False, sheet_name="Resultados")
-                memx.seek(0)
-                return memx
-
             xlsx_out = build_results_xlsx_trb(out)
             st.download_button("Baixar resultados (XLSX)", data=xlsx_out,
                                file_name="resultado_trb.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
             out_csv = io.BytesIO(); out.to_csv(out_csv, index=False, encoding="utf-8"); out_csv.seek(0)
             st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
         except Exception as e:
