@@ -183,8 +183,24 @@ with col3:
     )
     Cu = st.number_input("Cu (uniformidade)", 0.0, 1000.0, step=0.1, value=6.0, disabled=not (use_grad and allowed_grad))
     Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))
-    organico = st.checkbox("Aspecto orgânico marcante (cor escura, odor, fibras)?", value=False)
-    turfa = st.checkbox("Altamente orgânico (turfa)?", value=False) if organico else False
+    # Orgânico discreto (LL ≤ 50 → OL) x Orgânico marcante (LL > 50 → OH)
+    organico_marcante_allowed = (LL > 50.0)
+    organico_discreto_allowed = (LL <= 50.0)
+    organico_marcante = st.checkbox(
+        "Aspecto orgânico marcante (cor escura, odor, fibras)?",
+        value=False,
+        disabled=not organico_marcante_allowed,
+        help="Use quando LL > 50 e houver forte evidência macroscópica (cor escura intensa, odor, fibras). Classifica como OH se marcado."
+    )
+    organico_discreto = st.checkbox(
+        "Evidência orgânica discreta (para classificar como OL)",
+        value=False,
+        disabled=not organico_discreto_allowed,
+        help="Use quando LL ≤ 50 e houver indícios de matéria orgânica (cor/odor) ou redução do LL após secagem em estufa maior que ~30 pontos (critérios usuais em ASTM D2487/D4318)."
+    )
+    organico = (organico_marcante or organico_discreto)
+    turfa = st.checkbox("Altamente orgânico (turfa)?", value=False, disabled=not organico,
+                        help="Para materiais altamente orgânicos e fibrosos. Classifica como Pt.")
 if st.button("Classificar (formulário acima)"):
     # Validação: se grossa, exigir soma ≈ 100 para pedregulho+areia
     if coarse:
