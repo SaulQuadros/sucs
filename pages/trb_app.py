@@ -7,6 +7,13 @@ from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
+with st.sidebar:
+    st.header("Identificação")
+    meta_projeto = st.text_input("Projeto")
+    meta_nome = st.text_input("Nome")
+    meta_tecnico = st.text_input("Técnico Responsável")
+    meta_codigo = st.text_input("Código da Amostra")
+
 with st.expander("ℹ️ Ajuda rápida", expanded=False):
     st.markdown(
         "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB.\n"
@@ -34,10 +41,14 @@ def build_excel_template_bytes_trb():
     ]
     rows = []
     for g, desc, params in exemplos:
-        row = dict(Grupo_esperado=g, descricao_sintetica=desc)
+        row = dict(Projeto="", Nome="", **{"Técnico Responsável":""}, **{"Código da Amostra":""},
+                   Grupo_esperado=g, descricao_sintetica=desc)
         row.update(params)
         rows.append(row)
-    df = pd.DataFrame(rows)
+    df = pd.DataFrame(rows, columns=[
+        "Projeto","Nome","Técnico Responsável","Código da Amostra",
+        "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
+    ])
     mem = io.BytesIO()
     try:
         with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
@@ -49,7 +60,8 @@ def build_excel_template_bytes_trb():
     return mem
 
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
-    preferred = ["P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","aviso_ig","relatorio"]
+    preferred = ["Projeto","Nome","Técnico Responsável","Código da Amostra",
+                 "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","aviso_ig","relatorio"]
     cols = [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
     df = df[cols]
     mem = io.BytesIO()
@@ -63,9 +75,9 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
             warn = wb.add_format({"bg_color": "#FFF3CD"})
             ws.set_row(0, None, hdr)
             width_map = {
-                "P10":10, "P40":10, "P200":10, "LL":8, "LP":8,
-                "IP_calc":9, "Grupo_TRB":12, "IG":6, "Subleito":18,
-                "aviso_ig":48, "relatorio":96
+                "Projeto":18, "Nome":18, "Técnico Responsável":22, "Código da Amostra":18,
+                "P10":10, "P40":10, "P200":10, "LL":8, "LP":8, "IP_calc":9,
+                "Grupo_TRB":12, "IG":6, "Subleito":18, "aviso_ig":48, "relatorio":96
             }
             for idx, col in enumerate(df.columns, start=1):
                 w = width_map.get(col, 12)
@@ -75,10 +87,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
             if "aviso_ig" in df.columns:
                 col_idx = df.columns.get_loc("aviso_ig")
                 ws.conditional_format(1, col_idx, len(df), col_idx, {
-                    "type": "text",
-                    "criteria": "not containing",
-                    "value": "",
-                    "format": warn
+                    "type": "text", "criteria": "not containing", "value": "", "format": warn
                 })
             if "Grupo_TRB" in df.columns and "IG" in df.columns:
                 res = (
@@ -118,23 +127,32 @@ with col1:
             st.caption(f"Comportamento como subleito: **{r.subleito}**")
             if r.aviso_ig:
                 st.warning(r.aviso_ig)
-            st.text_area("Relatório (texto)", r.relatorio, height=300)
-            mem = io.BytesIO(r.relatorio.encode("utf-8"))
-            st.download_button("Baixar relatório (.txt)", data=mem, file_name="relatorio_trb.txt", mime="text/plain")
+            # Relatório com cabeçalho de identificação
+            meta_hdr = (f"Projeto: {meta_projeto or '-'}\n"
+                        f"Nome: {meta_nome or '-'}\n"
+                        f"Técnico Responsável: {meta_tecnico or '-'}\n"
+                        f"Código da Amostra: {meta_codigo or '-'}\n\n")
+            rel = meta_hdr + r.relatorio
+            st.text_area("Relatório (texto)", rel, height=300)
+            mem = io.BytesIO(rel.encode("utf-8"))
+            fname = f"TRB_{(meta_codigo or 'amostra').replace(' ', '_')}.txt"
+            st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
         except Exception as e:
             st.error(str(e))
 
 with col2:
     st.subheader("Lote (CSV / Excel)")
     modelo_csv = pd.DataFrame([
-        {"P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-        {"P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-        {"P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-        {"P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
+        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
+        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
+        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
+        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
     ])
-    csv_buf = io.BytesIO()
-    modelo_csv.to_csv(csv_buf, index=False, encoding="utf-8")
-    csv_buf.seek(0)
+    csv_buf = io.BytesIO(); modelo_csv.to_csv(csv_buf, index=False, encoding="utf-8"); csv_buf.seek(0)
     st.download_button("Baixar planilha-modelo (CSV)", data=csv_buf, file_name="modelo_trb.csv", mime="text/csv")
 
     xlsx_buf = build_excel_template_bytes_trb()
@@ -153,11 +171,17 @@ with col2:
                 up.seek(0)
                 df = pd.read_csv(up, sep=sep, encoding='utf-8-sig')
 
+            # Normaliza NP e injeta metadados da sidebar se não vierem
             if 'NP' in df.columns:
                 df['NP'] = df['NP'].astype(str).str.strip().str.lower().map({
                     'true': True, 'false': False, '1': True, '0': False,
                     'sim': True, 'não': False, 'nao': False, 'np': True
                 }).fillna(False)
+
+            for col, val in {"Projeto": meta_projeto, "Nome": meta_nome,
+                             "Técnico Responsável": meta_tecnico, "Código da Amostra": meta_codigo}.items():
+                if col not in df.columns and val:
+                    df[col] = val
 
             out = classify_dataframe_trb(df)
             st.dataframe(out, use_container_width=True)
@@ -167,9 +191,7 @@ with col2:
                                file_name="resultado_trb.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
 
-            out_csv = io.BytesIO()
-            out.to_csv(out_csv, index=False, encoding="utf-8")
-            out_csv.seek(0)
+            out_csv = io.BytesIO(); out.to_csv(out_csv, index=False, encoding="utf-8"); out_csv.seek(0)
             st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
         except Exception as e:
             st.error(str(e))

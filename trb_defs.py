@@ -1,5 +1,7 @@
-
 # trb_defs.py
+# Resumos/definições por grupo TRB segundo o Manual do DNIT (paráfrases).
+# Você pode colar o texto oficial em GROUP_DEF_OFICIAL, se desejar.
+
 GROUP_DEF_RESUMO = {
     "A-1-a": "Materiais granulares de alta qualidade, com baixos finos e bem graduados; uso favorável como subleito.",
     "A-1-b": "Semelhante ao A-1-a, porém com fração fina um pouco maior; geralmente bom como subleito.",
@@ -15,13 +17,18 @@ GROUP_DEF_RESUMO = {
     "A-7-6": "Argilas de LL alto com IP elevado (IP > LL − 30).",
 }
 
-GROUP_DEF_OFICIAL = {}
+# Cole aqui, se quiser, o texto literal do DNIT:
+GROUP_DEF_OFICIAL = {
+    # "A-7": "Grupo A-7 – ... (texto oficial do manual)"
+}
 
+# Linha de "comportamento como subleito" do quadro TRB
 SUBLEITO_TX = {
     "granular": "Excelente a bom.",
     "fino": "Sofrível a mau."
 }
 
+# Faixas típicas do IG por grupo (para checagem de coerência)
 IG_TIPICO_MAX = {
     "A-1-a": 0, "A-1-b": 0, "A-3": 0,
     "A-2-4": 12, "A-2-5": 12, "A-2-6": 12, "A-2-7": 12,

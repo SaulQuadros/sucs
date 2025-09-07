@@ -1,10 +1,10 @@
-
 # trb_core.py
 from dataclasses import dataclass
 from typing import List, Optional
 
 from trb_defs import get_definicao, get_subleito_text, ig_tipico_max
 
+# Rótulo rápido por grupo (para UI)
 GROUP_DESC = {
     "A-1-a": "Granular de alta qualidade; excelente a bom como subleito.",
     "A-1-b": "Granular bem graduado; geralmente bom como subleito.",
@@ -38,6 +38,7 @@ def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 def group_index(p200: float, ll: float, ip: float) -> int:
+    # Índice de Grupo (IG) com limitadores (a,b,c,d) aplicados antes das subtrações
     P1 = _clamp(p200, 35.0, 75.0); a = P1 - 35.0
     P2 = _clamp(p200, 15.0, 55.0); b = P2 - 15.0
     LL1 = _clamp(ll,   40.0, 60.0); c = LL1 - 40.0
@@ -67,9 +68,9 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
     linhas.append(f"  % passante #40 = {p40:.2f}%")
     linhas.append(f"  % passante #200 = {p200:.2f}%")
     if is_np:
-        linhas.append(f"  IP = NP (não-plástico)")
-        linhas.append(f"  LL (ignorado por NP)")
-        linhas.append(f"  LP (ignorado por NP)")
+        linhas.append("  IP = NP (não-plástico)")
+        linhas.append("  LL (ignorado por NP)")
+        linhas.append("  LP (ignorado por NP)")
     else:
         linhas.append(f"  LL = {ll:.2f}")
         linhas.append(f"  LP = {lp:.2f}")
@@ -80,7 +81,6 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
         linhas.append(f"  • {r}")
     linhas.append("")
     linhas.append(f"Interpretação TRB (resumo): {GROUP_DESC.get(group, '—')}")
-    from trb_defs import get_definicao
     defin = get_definicao(group, preferir_oficial=True)
     if defin and defin != "—":
         linhas.append("")
@@ -130,7 +130,6 @@ def classify_trb(p10: float, p40: float, p200: float, ll: float, lp: float, is_n
             else:
                 g = "A-7-6"; R.append("LL>40, IP≥11 e IP > LL−30")
     ig = group_index(p200, ll, ip)
-    from trb_defs import get_subleito_text, ig_tipico_max
     subleito = get_subleito_text(g)
     aviso = _aviso_ig(g, ig)
     relatorio = _build_relatorio(g, ig, R, p10, p40, p200, ll, lp, ip, is_np, subleito, aviso)
