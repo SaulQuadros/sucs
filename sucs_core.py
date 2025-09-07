@@ -7,6 +7,42 @@ from datetime import datetime
 
 LINE_A_SLOPE = 0.73  # IP = 0.73*(LL - 20)
 
+
+DNIT_DESC = {
+    "GW": "Pedregulhos bem graduados ou misturas de areia de pedregulho, com pouco ou nenhum fino.",
+    "GP": "Pedregulhos mal graduados ou misturas de areia e pedregulho, com pouco ou nenhum fino.",
+    "GM": "Pedregulhos siltosos ou misturas de pedregulho, areia e silte.",
+    "GC": "Pedregulhos argilosos ou misturas de pedregulho, areia e argila.",
+    "SW": "Areias bem graduadas ou areias pedregulhosas, com pouco ou nenhum fino.",
+    "SP": "Areias mal graduadas ou areias pedregulosas, com pouco ou nenhum fino.",
+    "SM": "Areias siltosas — misturas de areia e silte.",
+    "SC": "Areias argilosas — misturas de areia e argila.",
+    "ML": "Siltes inorgânicos; areias muito finas; areias finas siltosas e argilosas.",
+    "CL": "Argilas inorgânicas de baixa e média plasticidade; argilas pedregulhosas, arenosas e siltosas.",
+    "OL": "Siltes orgânicos; argilas siltosas orgânicas de baixa plasticidade.",
+    "MH": "Siltes (micáceos), areias finas/siltes micáceos; siltes elásticos.",
+    "CH": "Argilas inorgânicas de alta plasticidade.",
+    "OH": "Argilas orgânicas de alta e média plasticidade.",
+    "Pt": "Turfos e outros solos altamente orgânicos.",
+}
+def dnit_description_for_group(grp: str) -> str | None:
+    if not grp:
+        return None
+    # Símbolo duplo (ex.: SW-SM): concatena descrições do primeiro e do segundo símbolo
+    if "-" in grp:
+        parts = [p.strip() for p in grp.split("-") if p.strip()]
+        descs = [DNIT_DESC.get(p) for p in parts if DNIT_DESC.get(p)]
+        if not descs:
+            return None
+        return " / ".join(descs) + " (limítrofe)."
+    return DNIT_DESC.get(grp)
+
+
+def _finalize(grp, report):
+    desc = dnit_description_for_group(grp)
+    if desc:
+        report.append(f"Descrição DNIT: {desc}")
+    return grp, "\n".join(report)
 def well_graded_letter(coarse_symbol, Cu, Cc):
     """
     Decide W/P quando finos < 5%.
@@ -79,7 +115,7 @@ def classify_sucs(data):
     # Turfa tem prioridade
     if turfa:
         report.append("Observação: material altamente orgânico (turfa).")
-        return "Pt", "\n".join(report)
+        return _finalize("Pt", report)
 
     # Split grossa vs fina
     if pct_ret_200 >= 50.0:
@@ -106,7 +142,7 @@ def classify_sucs(data):
             else:
                 grp = coarse_symbol + W_or_P
                 report.append(f"  Finos < 5% e graduação {'boa' if W_or_P=='W' else 'má'} -> {grp}")
-            return grp, "\n".join(report)
+            return _finalize(grp, report)
 
         if 5.0 <= pct_finos <= 12.0:
             nat = fines_nature(LL, LP)
@@ -116,7 +152,7 @@ def classify_sucs(data):
             second = coarse_symbol if nat is None else coarse_symbol + ("M" if nat=="M" else "C")
             grp = f"{base}-{second}".replace("GG","G").replace("SS","S")
             report.append(f"  Finos 5–12% (limítrofe): {grp}")
-            return grp, "\n".join(report)
+            return _finalize(grp, report)
 
         # >12% finos
         nat = fines_nature(LL, LP)
@@ -126,7 +162,7 @@ def classify_sucs(data):
         else:
             grp = (coarse_symbol + nat).replace("GG","G").replace("SS","S")
             report.append(f"  Finos > 12% e finos {'siltosos' if nat=='M' else 'argilosos'} -> {grp}")
-        return grp, "\n".join(report)
+        return _finalize(grp, report)
 
     else:
         # Fração fina (solos finos)
@@ -136,16 +172,16 @@ def classify_sucs(data):
             else:
                 grp = "OL" if LL < 50.0 else "OH"
             report.append(f"  Solo com aspecto orgânico -> {grp}")
-            return grp, "\n".join(report)
+            return _finalize(grp, report)
 
         nat = fines_nature(LL, LP)  # 'M' ou 'C'
         if nat is None or LL is None:
             report.append("  LL/LP ausentes: não é possível posicionar no gráfico de plasticidade.")
-            return "M?/C?", "\n".join(report)
+            return _finalize("M?/C?", report)
         L_or_H = "L" if LL < 50.0 else "H"
         grp = (("M" if nat=="M" else "C") + L_or_H)
         report.append(f"  Solo fino: {'silte' if nat=='M' else 'argila'}; LL {'< 50' if L_or_H=='L' else '≥ 50'} -> {grp}")
-        return grp, "\n".join(report)
+        return _finalize(grp, report)
 
 def classify_dataframe(df):
     """Aplica classify_sucs linha a linha e retorna df com colunas 'grupo' e 'relatorio'."""
