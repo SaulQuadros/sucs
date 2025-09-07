@@ -64,7 +64,10 @@ with col1:
             r = classify_trb(p10, p40, p200, ll, lp, is_np=np_)
             st.success(f"Grupo TRB: **{r.group}**  |  IG = **{r.ig}** ({ig_label(r.ig)})")
             st.caption(f"Interpretação TRB: {GROUP_DESC.get(r.group, '—')}")
-            st.text_area("Relatório (texto)", r.relatorio, height=260)
+            st.caption(f"Comportamento como subleito: **{r.subleito}**")
+            if r.aviso_ig:
+                st.warning(r.aviso_ig)
+            st.text_area("Relatório (texto)", r.relatorio, height=280)
             mem = io.BytesIO(r.relatorio.encode("utf-8"))
             st.download_button("Baixar relatório (.txt)", data=mem, file_name="relatorio_trb.txt", mime="text/plain")
         except Exception as e:
@@ -96,7 +99,6 @@ with col2:
                 up.seek(0)
                 df = pd.read_csv(up, sep=sep, encoding='utf-8-sig')
 
-            # Normaliza NP se vier como texto
             if 'NP' in df.columns:
                 df['NP'] = df['NP'].astype(str).str.strip().str.lower().map({
                     'true': True, 'false': False, '1': True, '0': False,

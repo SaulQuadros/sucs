@@ -3,22 +3,21 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from trb_defs import get_definicao
+from trb_defs import get_definicao, get_subleito_text, ig_tipico_max
 
-# Interpretação curta (compatível com a UI)
 GROUP_DESC = {
     "A-1-a": "Granular de alta qualidade; excelente a bom como subleito.",
     "A-1-b": "Granular bem graduado; geralmente bom como subleito.",
     "A-3":   "Areia fina não plástica; sensível à umidade; bom a regular.",
-    "A-2-4": "Granular com finos siltosos (LL≤40); regular a bom.",
-    "A-2-5": "Granular com finos siltosos (LL>40); regular.",
-    "A-2-6": "Granular com finos argilosos (LL≤40); regular a sofrível.",
-    "A-2-7": "Granular com finos argilosos (LL>40); sofrível.",
-    "A-4":   "Silte de LL baixo; regular a sofrível.",
-    "A-5":   "Silte de LL alto; sofrível a mau.",
-    "A-6":   "Argila de LL baixo; sofrível a mau.",
-    "A-7-5": "Argila de LL alto (menos plástica); mau como subleito.",
-    "A-7-6": "Argila de LL alto (mais plástica); mau como subleito.",
+    "A-2-4": "Granular c/ finos siltosos (LL≤40).",
+    "A-2-5": "Granular c/ finos siltosos (LL>40).",
+    "A-2-6": "Granular c/ finos argilosos (LL≤40).",
+    "A-2-7": "Granular c/ finos argilosos (LL>40).",
+    "A-4":   "Silte (LL baixo).",
+    "A-5":   "Silte (LL alto), elástico.",
+    "A-6":   "Argila (LL baixo).",
+    "A-7-5": "Argila (LL alto), IP moderado.",
+    "A-7-6": "Argila (LL alto), IP elevado.",
 }
 
 def ig_label(ig: int) -> str:
@@ -32,12 +31,13 @@ class TRBResult:
     ig: int
     rationale: List[str]
     relatorio: str
+    subleito: str
+    aviso_ig: str
 
 def _clamp(x: float, lo: float, hi: float) -> float:
     return max(lo, min(hi, x))
 
 def group_index(p200: float, ll: float, ip: float) -> int:
-    # Índice de Grupo (IG) com LIMITADORES aplicados antes das subtrações
     P1 = _clamp(p200, 35.0, 75.0); a = P1 - 35.0
     P2 = _clamp(p200, 15.0, 55.0); b = P2 - 15.0
     LL1 = _clamp(ll,   40.0, 60.0); c = LL1 - 40.0
@@ -46,13 +46,21 @@ def group_index(p200: float, ll: float, ip: float) -> int:
     ig_i = int(round(max(0.0, min(20.0, ig))))
     return ig_i
 
+def _aviso_ig(group: str, ig: int) -> str:
+    tmax = ig_tipico_max(group)
+    if ig > tmax:
+        return f"Atenção: IG calculado ({ig}) acima da faixa típica para {group} (≤{tmax}). Verifique dados/ensaios."
+    return ""
+
 def _build_relatorio(group: str, ig: int, rationale: List[str],
                      p10: float, p40: float, p200: float, ll: float, lp: float,
-                     ip: float, is_np: bool) -> str:
+                     ip: float, is_np: bool, subleito: str, aviso_ig: str) -> str:
     linhas = []
     linhas.append("=== Classificação TRB (HRB/AASHTO) ===")
     linhas.append(f"Grupo: {group}")
     linhas.append(f"Índice de Grupo (IG): {ig} — {ig_label(ig)}")
+    if aviso_ig:
+        linhas.append(f"⚠ {aviso_ig}")
     linhas.append("")
     linhas.append("Entradas:")
     linhas.append(f"  % passante #10 = {p10:.2f}%")
@@ -72,11 +80,14 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
         linhas.append(f"  • {r}")
     linhas.append("")
     linhas.append(f"Interpretação TRB (resumo): {GROUP_DESC.get(group, '—')}")
+    from trb_defs import get_definicao
     defin = get_definicao(group, preferir_oficial=True)
     if defin and defin != "—":
         linhas.append("")
         linhas.append("Definição DNIT:")
         linhas.append(defin)
+    linhas.append("")
+    linhas.append(f"Comportamento como subleito: {subleito}")
     linhas.append("Observação: O IG não define o grupo; apenas qualifica o desempenho do subleito (quanto menor, melhor).")
     return "\n".join(linhas)
 
@@ -119,8 +130,11 @@ def classify_trb(p10: float, p40: float, p200: float, ll: float, lp: float, is_n
             else:
                 g = "A-7-6"; R.append("LL>40, IP≥11 e IP > LL−30")
     ig = group_index(p200, ll, ip)
-    relatorio = _build_relatorio(g, ig, R, p10, p40, p200, ll, lp, ip, is_np)
-    return TRBResult(group=g, ig=ig, rationale=R, relatorio=relatorio)
+    from trb_defs import get_subleito_text, ig_tipico_max
+    subleito = get_subleito_text(g)
+    aviso = _aviso_ig(g, ig)
+    relatorio = _build_relatorio(g, ig, R, p10, p40, p200, ll, lp, ip, is_np, subleito, aviso)
+    return TRBResult(group=g, ig=ig, rationale=R, relatorio=relatorio, subleito=subleito, aviso_ig=aviso)
 
 def classify_dataframe_trb(df, cols_map: Optional[dict]=None):
     import pandas as pd
@@ -137,7 +151,6 @@ def classify_dataframe_trb(df, cols_map: Optional[dict]=None):
             ll = 0.0; lp = 0.0; ip = 0.0
         else:
             ll = float(row.get(c['LL'], 0))
-            # Tenta usar LP; se não existir, tenta IP e calcula LP = LL - IP
             if c['LP'] in df.columns:
                 lp = float(row.get(c['LP'], 0))
                 ip = max(0.0, ll - lp)
@@ -145,5 +158,8 @@ def classify_dataframe_trb(df, cols_map: Optional[dict]=None):
                 ip = float(row.get(c['IP'], 0))
                 lp = max(0.0, ll - ip)
         r = classify_trb(p10, p40, p200, ll, lp, is_np=np_)
-        out.append({**row, 'IP_calc': ip, 'Grupo_TRB': r.group, 'IG': r.ig, 'relatorio': r.relatorio})
+        out.append({**row,
+            'IP_calc': max(0.0, ll - lp) if not np_ else 0.0,
+            'Grupo_TRB': r.group, 'IG': r.ig, 'Subleito': r.subleito,
+            'relatorio': r.relatorio, 'aviso_ig': r.aviso_ig})
     return pd.DataFrame(out)
