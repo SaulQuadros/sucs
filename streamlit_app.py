@@ -1,3 +1,8 @@
+#!/usr/bin/env python
+# coding: utf-8
+
+# In[ ]:
+
 
 # streamlit_app.py
 # App Streamlit para classificar solos pelo SUCS (conforme DNIT/SUCS)
@@ -9,8 +14,6 @@ import matplotlib.pyplot as plt
 
 from sucs_core import classify_sucs, classify_dataframe, LINE_A_SLOPE
 
-
-# Link para página TRB (HRB/AASHTO)
 try:
     st.sidebar.page_link("pages/trb_app.py", label="Classificação TRB (HRB/AASHTO)")
 except Exception:
@@ -169,7 +172,7 @@ with col2:
     st.pyplot(fig)
 
 with col3:
-    st.subheader("Opcional")
+    st.subheader("Características")
     allowed_grad = coarse and (fines < 5.0)
     use_grad = st.checkbox(
         "Usar Cu/Cc para decidir W/P (somente grossa com finos < 5%)",
@@ -178,9 +181,24 @@ with col3:
         disabled=not allowed_grad,
     )
     Cu = st.number_input("Cu (uniformidade)", 0.0, 1000.0, step=0.1, value=6.0, disabled=not (use_grad and allowed_grad))
-    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))
-    organico = st.checkbox("Aspecto orgânico marcante (cor escura, odor, fibras)?", value=False)
-    turfa = st.checkbox("Altamente orgânico (turfa)?", value=False) if organico else False
+    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))    # Orgânico discreto (LL ≤ 50 → OL) primeiro; orgânico marcante (LL > 50 → OH) em seguida
+    organico_discreto_allowed = (LL <= 50.0)
+    organico_marcante_allowed = (LL > 50.0)
+    organico_discreto = st.checkbox(
+        "Evidência orgânica discreta (para classificar como OL)",
+        value=False,
+        disabled=not organico_discreto_allowed,
+        help="Use quando LL ≤ 50 e houver indícios de matéria orgânica (cor/odor) ou redução do LL após secagem em estufa maior que ~30 pontos (critérios usuais em ASTM D2487/D4318)."
+    )
+    organico_marcante = st.checkbox(
+        "Aspecto orgânico marcante (cor escura, odor, fibras)?",
+        value=False,
+        disabled=not organico_marcante_allowed,
+        help="Use quando LL > 50 e houver forte evidência macroscópica (cor escura intensa, odor, fibras). Classifica como OH se marcado."
+    )
+    organico = (organico_discreto or organico_marcante)
+    turfa = st.checkbox("Altamente orgânico (turfa)?", value=False, disabled=not organico,
+                        help="Para materiais altamente orgânicos e fibrosos. Classifica como Pt.")
 
 st.divider()
 if st.button("Classificar (formulário acima)"):
@@ -217,3 +235,4 @@ if uploaded is not None:
     buf = io.StringIO()
     res.to_csv(buf, index=False)
     st.download_button("Baixar resultados (CSV)", buf.getvalue(), file_name="resultados_sucs.csv")
+
