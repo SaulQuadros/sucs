@@ -23,7 +23,33 @@ except Exception:
 def build_excel_template_bytes():
     import io
     import pandas as pd
-
+    # Planilha-modelo SUCS: cabeçalhos oficiais e algumas linhas de exemplo
+    cols = [
+        "grupo_esperado","descricao_sintetica",
+        "projeto","tecnico","amostra",
+        "pct_retido_200","pct_pedregulho_coarse","pct_areia_coarse",
+        "LL","LP","Cu","Cc","organico","turfa"
+    ]
+    exemplos = [
+        dict(grupo_esperado="GW", descricao_sintetica="Cascalho bem graduado", projeto="Demo", tecnico="Equipe",
+             amostra="Ex1", pct_retido_200=None, pct_pedregulho_coarse=70, pct_areia_coarse=30,
+             LL=None, LP=None, Cu=8, Cc=2.0, organico=False, turfa=False),
+        dict(grupo_esperado="SW", descricao_sintetica="Areia bem graduada", projeto="Demo", tecnico="Equipe",
+             amostra="Ex2", pct_retido_200=None, pct_pedregulho_coarse=30, pct_areia_coarse=70,
+             LL=None, LP=None, Cu=7, Cc=1.5, organico=False, turfa=False),
+        dict(grupo_esperado="CL", descricao_sintetica="Silte/argila de baixa plasticidade", projeto="Demo", tecnico="Equipe",
+             amostra="Ex3", pct_retido_200=55, pct_pedregulho_coarse=10, pct_areia_coarse=35,
+             LL=35, LP=22, Cu=None, Cc=None, organico=False, turfa=False),
+    ]
+    df = pd.DataFrame.from_records(exemplos, columns=cols)
+    bio = io.BytesIO()
+    eng = _resolve_xlsx_engine()
+    if not eng:
+        raise RuntimeError("Nenhum engine Excel disponível. Instale XlsxWriter ou openpyxl.")
+    with pd.ExcelWriter(bio, engine=eng) as writer:
+        df.to_excel(writer, index=False, sheet_name="exemplos")
+    bio.seek(0)
+    return bio
 # --- Excel engine resolver (XLSX) ---
 def _resolve_xlsx_engine():
     """Return a working engine string for pandas.ExcelWriter (prefer xlsxwriter)."""
