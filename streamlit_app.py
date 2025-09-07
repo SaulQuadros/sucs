@@ -23,6 +23,20 @@ except Exception:
 def build_excel_template_bytes():
     import io
     import pandas as pd
+
+# --- Excel engine resolver (XLSX) ---
+def _resolve_xlsx_engine():
+    """Return a working engine string for pandas.ExcelWriter (prefer xlsxwriter)."""
+    try:
+        import xlsxwriter  # type: ignore
+        return "xlsxwriter"
+    except Exception:
+        try:
+            import openpyxl  # type: ignore
+            return "openpyxl"
+        except Exception:
+            return None
+
     # monta um exemplo por grupo (mesma lógica dos exemplos gerados anteriormente)
     rows = [
         # grupo, descricao, params...
@@ -235,4 +249,3 @@ if uploaded is not None:
     buf = io.StringIO()
     res.to_csv(buf, index=False)
     st.download_button("Baixar resultados (CSV)", buf.getvalue(), file_name="resultados_sucs.csv")
-

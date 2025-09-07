@@ -4,6 +4,20 @@ import pandas as pd
 import streamlit as st
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 
+# --- Excel engine resolver (XLSX) ---
+def _resolve_xlsx_engine():
+    """Return a working engine string for pandas.ExcelWriter (prefer xlsxwriter)."""
+    try:
+        import xlsxwriter  # type: ignore
+        return "xlsxwriter"
+    except Exception:
+        try:
+            import openpyxl  # type: ignore
+            return "openpyxl"
+        except Exception:
+            return None
+
+
 st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
@@ -51,10 +65,10 @@ def build_excel_template_bytes_trb():
     ])
     mem = io.BytesIO()
     try:
-        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="modelo_trb")
     except Exception:
-        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="modelo_trb")
     mem.seek(0)
     return mem
@@ -66,7 +80,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     df = df[cols]
     mem = io.BytesIO()
     try:
-        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="Resultados")
             wb = xw.book
             ws = xw.sheets["Resultados"]
@@ -103,7 +117,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
                 for c in range(1, 5):
                     ws2.set_column(c, c, 12)
     except Exception:
-        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="Resultados")
     mem.seek(0)
     return mem
