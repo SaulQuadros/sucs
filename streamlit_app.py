@@ -174,11 +174,10 @@ with col3:
         "Permitir Cu/Cc",
         value=False,
         help=(
-            "Usa Cu e Cc para decidir W/P quando:
-"
-            "• Solos grossos com finos < 5%; ou
-"
-            "• Solos grossos com finos 5–12% e retido na #200 entre 88–95% (passante 5–12%)."
+            "Usa Cu e Cc para decidir W/P.\n"
+            "• Caso 1: solos grossos com finos < 5%.\n"
+            "• Caso 2: solos grossos com finos 5–12% e retido na #200 entre 88–95%.\n"
+            "Ativo apenas quando as condições forem atendidas."
         ),
         disabled=not allowed_grad,
     )
@@ -186,7 +185,7 @@ with col3:
     Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))
     organico = st.checkbox("Aspecto orgânico marcante (cor escura, odor, fibras)?", value=False)
     turfa = st.checkbox("Altamente orgânico (turfa)?", value=False) if organico else False
-r (formulário acima)"):
+if st.button("Classificar (formulário acima)"):
     # Validação: se grossa, exigir soma ≈ 100 para pedregulho+areia
     if coarse:
         total_coarse = pct_pedregulho + pct_areia
