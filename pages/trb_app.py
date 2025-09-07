@@ -8,11 +8,10 @@ st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
 with st.sidebar:
-    st.header("Identificação")
-    meta_projeto = st.text_input("Projeto")
-    meta_nome = st.text_input("Nome")
-    meta_tecnico = st.text_input("Técnico Responsável")
-    meta_codigo = st.text_input("Código da Amostra")
+    st.header("Projeto")
+    projeto = st.text_input("Nome do projeto")
+    tecnico = st.text_input("Técnico responsável")
+    amostra = st.text_input("Código da amostra")
 
 with st.expander("ℹ️ Ajuda rápida", expanded=False):
     st.markdown(
@@ -45,8 +44,7 @@ def build_excel_template_bytes_trb():
                    Grupo_esperado=g, descricao_sintetica=desc)
         row.update(params)
         rows.append(row)
-    df = pd.DataFrame(rows, columns=[
-        "Projeto","Nome","Técnico Responsável","Código da Amostra",
+    df = pd.DataFrame(rows, columns=["Nome do projeto","Técnico responsável","Código da amostra",
         "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
     ])
     mem = io.BytesIO()
@@ -60,7 +58,7 @@ def build_excel_template_bytes_trb():
     return mem
 
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
-    preferred = ["Projeto","Nome","Técnico Responsável","Código da Amostra",
+    preferred = ["Nome do projeto","Técnico responsável","Código da amostra",
                  "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","Materiais constituintes","aviso_ig","relatorio"]
     cols = [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
     df = df[cols]
@@ -75,7 +73,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
             warn = wb.add_format({"bg_color": "#FFF3CD"})
             ws.set_row(0, None, hdr)
             width_map = {
-                "Projeto":18, "Nome":18, "Técnico Responsável":22, "Código da Amostra":18,
+                "Nome do projeto":20, "Técnico responsável":22, "Código da amostra":18,
                 "P10":10, "P40":10, "P200":10, "LL":8, "LP":8, "IP_calc":9,
                 "Grupo_TRB":12, "IG":6, "Subleito":18, "Materiais constituintes":26, "aviso_ig":48, "relatorio":96
             }
@@ -128,10 +126,11 @@ with col1:
             if r.aviso_ig:
                 st.warning(r.aviso_ig)
             # Relatório com cabeçalho de identificação
-            meta_hdr = (f"Projeto: {meta_projeto or '-'}\n"
-                        f"Nome: {meta_nome or '-'}\n"
-                        f"Técnico Responsável: {meta_tecnico or '-'}\n"
-                        f"Código da Amostra: {meta_codigo or '-'}\n\n")
+            meta_hdr = (f"Nome do projeto: {projeto or '-'}
+"            f"Técnico responsável: {tecnico or '-'}
+"            f"Código da amostra: {amostra or '-'}
+
+")
             rel = meta_hdr + r.relatorio
             st.text_area("Relatório (texto)", rel, height=300)
             mem = io.BytesIO(rel.encode("utf-8"))
@@ -143,13 +142,13 @@ with col1:
 with col2:
     st.subheader("Lote (CSV / Excel)")
     modelo_csv = pd.DataFrame([
-        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
          "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
          "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
          "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-        {"Projeto": "", "Nome": "", "Técnico Responsável": "", "Código da Amostra": "",
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
          "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
     ])
     csv_buf = io.BytesIO(); modelo_csv.to_csv(csv_buf, index=False, encoding="utf-8"); csv_buf.seek(0)
@@ -178,8 +177,7 @@ with col2:
                     'sim': True, 'não': False, 'nao': False, 'np': True
                 }).fillna(False)
 
-            for col, val in {"Projeto": meta_projeto, "Nome": meta_nome,
-                             "Técnico Responsável": meta_tecnico, "Código da Amostra": meta_codigo}.items():
+            for col, val in {"Nome do projeto": projeto, "Técnico responsável": tecnico, "Código da amostra": amostra}.items():
                 if col not in df.columns and val:
                     df[col] = val
 
