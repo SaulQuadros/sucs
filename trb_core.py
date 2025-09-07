@@ -2,7 +2,7 @@
 from dataclasses import dataclass
 from typing import List, Optional
 
-from trb_defs import get_definicao, get_subleito_text, ig_tipico_max
+from trb_defs import get_definicao, get_subleito_text, ig_tipico_max, get_materiais
 
 # Rótulo rápido por grupo (para UI)
 GROUP_DESC = {
@@ -87,6 +87,7 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
         linhas.append("Definição DNIT:")
         linhas.append(defin)
     linhas.append("")
+    linhas.append(f"Materiais constituintes: {get_materiais(group)}")
     linhas.append(f"Comportamento como subleito: {subleito}")
     linhas.append("Observação: O IG não define o grupo; apenas qualifica o desempenho do subleito (quanto menor, melhor).")
     return "\n".join(linhas)

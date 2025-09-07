@@ -61,7 +61,7 @@ def build_excel_template_bytes_trb():
 
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     preferred = ["Projeto","Nome","Técnico Responsável","Código da Amostra",
-                 "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","aviso_ig","relatorio"]
+                 "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","Materiais constituintes","aviso_ig","relatorio"]
     cols = [c for c in preferred if c in df.columns] + [c for c in df.columns if c not in preferred]
     df = df[cols]
     mem = io.BytesIO()
@@ -77,7 +77,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
             width_map = {
                 "Projeto":18, "Nome":18, "Técnico Responsável":22, "Código da Amostra":18,
                 "P10":10, "P40":10, "P200":10, "LL":8, "LP":8, "IP_calc":9,
-                "Grupo_TRB":12, "IG":6, "Subleito":18, "aviso_ig":48, "relatorio":96
+                "Grupo_TRB":12, "IG":6, "Subleito":18, "Materiais constituintes":26, "aviso_ig":48, "relatorio":96
             }
             for idx, col in enumerate(df.columns, start=1):
                 w = width_map.get(col, 12)

@@ -46,3 +46,22 @@ def get_subleito_text(group: str) -> str:
 
 def ig_tipico_max(group: str) -> int:
     return IG_TIPICO_MAX.get(group, 20)
+
+# Materiais constituintes (linha específica da Tabela TRB do DNIT)
+MATERIAIS_CONSTITUINTES = {
+    "A-1-a": "Fragmentos de pedras, pedregulho fino e areia.",
+    "A-1-b": "Fragmentos de pedras, pedregulho fino e areia.",
+    "A-3":   "Areias finas predominantemente não plásticas.",
+    "A-2-4": "Pedregulho ou areias siltosos ou argilosos.",
+    "A-2-5": "Pedregulho ou areias siltosos ou argilosos.",
+    "A-2-6": "Pedregulho ou areias siltosos ou argilosos.",
+    "A-2-7": "Pedregulho ou areias siltosos ou argilosos.",
+    "A-4":   "Solos siltosos.",
+    "A-5":   "Solos siltosos.",
+    "A-6":   "Solos argilosos.",
+    "A-7-5": "Solos argilosos.",
+    "A-7-6": "Solos argilosos.",
+}
+
+def get_materiais(group: str) -> str:
+    return MATERIAIS_CONSTITUINTES.get(group, "—")
