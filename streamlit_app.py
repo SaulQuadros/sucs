@@ -161,46 +161,36 @@ with col2:
     ax.set_title("Gráfico de Plasticidade (linha A e ponto da amostra)")
     st.pyplot(fig)
 
-
 with col3:
-    st.subheader("Opcional")
-    # Habilita Cu/Cc para:
-    # (a) grossa com finos < 5%
-    # (b) grossa com finos entre 5–12% E retido #200 entre 88–95% (passante 5–12%)
-    allow_strict = coarse and (fines < 5.0)
-    allow_margin = coarse and (5.0 <= fines <= 12.0) and (88.0 <= pct_retido_200 <= 95.0)
-    allowed_grad = allow_strict or allow_margin
+    st.subheader("Características")
+    allowed_grad = coarse and (fines < 5.0)
     use_grad = st.checkbox(
-        "Permitir Cu/Cc",
+        "Usar Cu/Cc para decidir W/P (somente grossa com finos < 5%)",
         value=False,
-        help=(
-            "Usa Cu e Cc para decidir W/P.\n"
-            "• Caso 1: solos grossos com finos < 5%.\n"
-            "• Caso 2: solos grossos com finos 5–12% e retido na #200 entre 88–95%.\n"
-            "Ativo apenas quando as condições forem atendidas."
-        ),
+        help="Cu/Cc só se aplicam a solos de granulação grossa (G/S) com finos < 5%.",
         disabled=not allowed_grad,
     )
     Cu = st.number_input("Cu (uniformidade)", 0.0, 1000.0, step=0.1, value=6.0, disabled=not (use_grad and allowed_grad))
-    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))
-    # Orgânico discreto (LL ≤ 50 → OL) x Orgânico marcante (LL > 50 → OH)
-    organico_marcante_allowed = (LL > 50.0)
+    Cc = st.number_input("Cc (curvatura)", 0.0, 1000.0, step=0.01, value=1.5, disabled=not (use_grad and allowed_grad))    # Orgânico discreto (LL ≤ 50 → OL) primeiro; orgânico marcante (LL > 50 → OH) em seguida
     organico_discreto_allowed = (LL <= 50.0)
-    organico_marcante = st.checkbox(
-        "Aspecto orgânico marcante (cor escura, odor, fibras)?",
-        value=False,
-        disabled=not organico_marcante_allowed,
-        help="Use quando LL > 50 e houver forte evidência macroscópica (cor escura intensa, odor, fibras). Classifica como OH se marcado."
-    )
+    organico_marcante_allowed = (LL > 50.0)
     organico_discreto = st.checkbox(
         "Evidência orgânica discreta (para classificar como OL)",
         value=False,
         disabled=not organico_discreto_allowed,
         help="Use quando LL ≤ 50 e houver indícios de matéria orgânica (cor/odor) ou redução do LL após secagem em estufa maior que ~30 pontos (critérios usuais em ASTM D2487/D4318)."
     )
-    organico = (organico_marcante or organico_discreto)
+    organico_marcante = st.checkbox(
+        "Aspecto orgânico marcante (cor escura, odor, fibras)?",
+        value=False,
+        disabled=not organico_marcante_allowed,
+        help="Use quando LL > 50 e houver forte evidência macroscópica (cor escura intensa, odor, fibras). Classifica como OH se marcado."
+    )
+    organico = (organico_discreto or organico_marcante)
     turfa = st.checkbox("Altamente orgânico (turfa)?", value=False, disabled=not organico,
                         help="Para materiais altamente orgânicos e fibrosos. Classifica como Pt.")
+
+st.divider()
 if st.button("Classificar (formulário acima)"):
     # Validação: se grossa, exigir soma ≈ 100 para pedregulho+areia
     if coarse:
