@@ -22,6 +22,44 @@ st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
 st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
 
 # === Barra lateral (padrão SUCS) ===
+
+def build_excel_template_bytes_trb():
+    exemplos = [
+        ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
+        ("A-1-b", "Granular bom",               dict(P10=70, P40=45, P200=20, LL=35, LP=29, NP=False)),
+        ("A-3",   "Areia fina NP",              dict(P10=95, P40=80, P200=8,  LL=0,  LP=0,  NP=True)),
+        ("A-2-4", "Granular c/ silte (LL≤40)",  dict(P10=85, P40=60, P200=30, LL=35, LP=27, NP=False)),
+        ("A-2-5", "Granular c/ silte (LL>40)",  dict(P10=85, P40=60, P200=30, LL=45, LP=37, NP=False)),
+        ("A-2-6", "Granular c/ argila (LL≤40)", dict(P10=85, P40=60, P200=30, LL=35, LP=23, NP=False)),
+        ("A-2-7", "Granular c/ argila (LL>40)", dict(P10=85, P40=60, P200=30, LL=45, LP=33, NP=False)),
+        ("A-4",   "Silte LL baixo",             dict(P10=80, P40=60, P200=50, LL=35, LP=27, NP=False)),
+        ("A-5",   "Silte LL alto",              dict(P10=80, P40=60, P200=50, LL=50, LP=40, NP=False)),
+        ("A-6",   "Argila LL baixo",            dict(P10=80, P40=60, P200=50, LL=35, LP=22, NP=False)),
+        ("A-7-5", "Argila LL alto menos plást.",dict(P10=90, P40=70, P200=60, LL=55, LP=35, NP=False)),
+        ("A-7-6", "Argila LL alto mais plást.", dict(P10=90, P40=70, P200=60, LL=55, LP=25, NP=False)),
+    ]
+    rows = []
+    for g, desc, params in exemplos:
+        row = dict(**{"Nome do projeto":""}, **{"Técnico responsável":""}, **{"Código da amostra":""},
+                   Grupo_esperado=g, descricao_sintetica=desc)
+        row.update(params)
+        rows.append(row)
+    df = pd.DataFrame(rows, columns=[
+        "Nome do projeto","Técnico responsável","Código da amostra",
+        "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
+    ])
+    mem = io.BytesIO()
+    try:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
+            df.to_excel(xw, index=False, sheet_name="modelo_trb")
+    except Exception:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
+            df.to_excel(xw, index=False, sheet_name="modelo_trb")
+    mem.seek(0)
+    return mem
+
+
+
 with st.sidebar:
     st.header("Projeto")
     projeto = st.text_input("Nome do projeto")
@@ -61,42 +99,6 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
 
 
 col1, col2 = st.columns([2, 1])
-
-def build_excel_template_bytes_trb():
-    exemplos = [
-        ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
-        ("A-1-b", "Granular bom",               dict(P10=70, P40=45, P200=20, LL=35, LP=29, NP=False)),
-        ("A-3",   "Areia fina NP",              dict(P10=95, P40=80, P200=8,  LL=0,  LP=0,  NP=True)),
-        ("A-2-4", "Granular c/ silte (LL≤40)",  dict(P10=85, P40=60, P200=30, LL=35, LP=27, NP=False)),
-        ("A-2-5", "Granular c/ silte (LL>40)",  dict(P10=85, P40=60, P200=30, LL=45, LP=37, NP=False)),
-        ("A-2-6", "Granular c/ argila (LL≤40)", dict(P10=85, P40=60, P200=30, LL=35, LP=23, NP=False)),
-        ("A-2-7", "Granular c/ argila (LL>40)", dict(P10=85, P40=60, P200=30, LL=45, LP=33, NP=False)),
-        ("A-4",   "Silte LL baixo",             dict(P10=80, P40=60, P200=50, LL=35, LP=27, NP=False)),
-        ("A-5",   "Silte LL alto",              dict(P10=80, P40=60, P200=50, LL=50, LP=40, NP=False)),
-        ("A-6",   "Argila LL baixo",            dict(P10=80, P40=60, P200=50, LL=35, LP=22, NP=False)),
-        ("A-7-5", "Argila LL alto menos plást.",dict(P10=90, P40=70, P200=60, LL=55, LP=35, NP=False)),
-        ("A-7-6", "Argila LL alto mais plást.", dict(P10=90, P40=70, P200=60, LL=55, LP=25, NP=False)),
-    ]
-    rows = []
-    for g, desc, params in exemplos:
-        row = dict(**{"Nome do projeto":""}, **{"Técnico responsável":""}, **{"Código da amostra":""},
-                   Grupo_esperado=g, descricao_sintetica=desc)
-        row.update(params)
-        rows.append(row)
-    df = pd.DataFrame(rows, columns=[
-        "Nome do projeto","Técnico responsável","Código da amostra",
-        "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
-    ])
-    mem = io.BytesIO()
-    try:
-        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
-            df.to_excel(xw, index=False, sheet_name="modelo_trb")
-    except Exception:
-        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
-            df.to_excel(xw, index=False, sheet_name="modelo_trb")
-    mem.seek(0)
-    return mem
-
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     preferred = ["Nome do projeto","Técnico responsável","Código da amostra",
                  "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","Materiais constituintes","aviso_ig","relatorio"]
