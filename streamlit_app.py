@@ -144,20 +144,14 @@ st.title("Classificador SUCS — DNIT")
 
 with st.expander("ℹ️ Ajuda rápida", expanded=False):
     st.markdown(
-        "\n".join([
-            "- O SUCS inicia pela **fração fina (#200)**:",
-            "  - Se **% passante #200 < 50%** → material **coarse** (areia/cascalho).",
-            "  - Se **% passante #200 ≥ 50%** → material **fino** (siltes/argilas).",
-            "- Para **coarse**:",
-            "  - Separar **cascalho × areia** na #4 (pedregulho > #4).",
-            "  - Quando finos **< 5%**, usar **Cu** e **Cc**: **W** (bem graduado) ou **P** (mal graduado).",
-            "  - Quando **5% ≤ finos ≤ 12%**, usar sufixos mistos (**GW-GM**, **SW-SC**, etc.).",
-            "  - Quando **fins > 12%**, a classificação passa a depender da plasticidade.",
-            "- Para **finos**:",
-            "  - Usar **LL** e **LP** (Atterberg).",
-            "  - **Linha A**: IP = 0,73(LL − 20). Abaixo → **M** (siltoso); acima → **C** (argiloso).",
-            "- **Materiais orgânicos** → sufixo **O**; **turfa** → **Pt** (classificação específica).",
-        ])
+        "- **Fluxo SUCS**: Primeiro verifica-se o teor de finos (% passante #200).\\n"
+        "  - **Coarse (arenas/cascalhos)**: se passante #200 < 50%.\\n"
+        "    - Separação **cascalho** × **areia** pela peneira #4 (pedregulho > #4).\\n"
+        "    - Gradação **bem graduado (W)**/**mal graduado (P)** por **Cu** e **Cc** quando os finos < 5%.\\n"
+        "  - **Finos (siltes/argilas)**: se passante #200 ≥ 50%.\\n"
+        "    - Usa-se **LL/LP** e a **linha A** (IP = 0.73(LL−20)) para definir **M** (abaixo) ou **C** (acima).\\n"
+        "    - Materiais orgânicos (O) e **turfa (Pt)** têm regras específicas.\\n"
+        "- **Observações**: Quando 5% ≤ finos ≤ 12%, combina-se sufixos (por ex., GW-GM). Quando finos > 12%, a classificação é conduzida por plasticidade."
     )
     st.divider()
     st.subheader("Planilha-modelo (SUCS)")
@@ -173,29 +167,13 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
     except Exception as _e:
         st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 
-    # CSV modelo (mesmas colunas)
-    _modelo_cols = [
-        "grupo_esperado","descricao_sintetica","projeto","tecnico","amostra",
-        "pct_retido_200","pct_pedregulho_coarse","pct_areia_coarse",
-        "LL","LP","Cu","Cc","organico","turfa"
-    ]
-    _modelo_rows = [
-        {"grupo_esperado":"GW","descricao_sintetica":"Cascalho bem graduado","projeto":"","tecnico":"","amostra":"",
-         "pct_retido_200":97,"pct_pedregulho_coarse":70,"pct_areia_coarse":30,"LL":None,"LP":None,"Cu":8,"Cc":2.0,"organico":False,"turfa":False},
-        {"grupo_esperado":"SW","descricao_sintetica":"Areia bem graduada","projeto":"","tecnico":"","amostra":"",
-         "pct_retido_200":97,"pct_pedregulho_coarse":30,"pct_areia_coarse":70,"LL":None,"LP":None,"Cu":7,"Cc":1.5,"organico":False,"turfa":False},
-        {"grupo_esperado":"CL","descricao_sintetica":"Baixa plasticidade","projeto":"","tecnico":"","amostra":"",
-         "pct_retido_200":55,"pct_pedregulho_coarse":10,"pct_areia_coarse":35,"LL":35,"LP":22,"Cu":None,"Cc":None,"organico":False,"turfa":False},
-    ]
-    _df_modelo = pd.DataFrame.from_records(_modelo_rows, columns=_modelo_cols)
-    _csv_buf = io.BytesIO(); _df_modelo.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
-    st.download_button(
-        "Baixar planilha-modelo (CSV)",
-        data=_csv_buf,
-        file_name="SUCS_todos_os_grupos.csv",
-        mime="text/csv",
-        key="dl_model_sucs_csv_main",
-    )
+
+with st.sidebar:
+    st.header("Projeto")
+    projeto = st.text_input("Nome do projeto")
+    tecnico = st.text_input("Técnico responsável")
+    amostra = st.text_input("Código da amostra")
+
 col1, col2, col3 = st.columns([1.2, 1, 1])
 
 with col1:
