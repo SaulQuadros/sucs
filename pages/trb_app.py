@@ -18,8 +18,8 @@ def _resolve_xlsx_engine():
             return None
 
 
-st.set_page_config(page_title="Classificação TRB (HRB/AASHTO)")
-st.title("Classificação TRB (antigo HRB/AASHTO) + Índice de Grupo (IG)")
+st.set_page_config(page_title="Classificação TRB - DNIT")
+st.title("Classificação TRB - DNIT")
 
 # === Barra lateral (padrão SUCS) ===
 
@@ -65,15 +65,6 @@ with st.sidebar:
     projeto = st.text_input("Nome do projeto")
     tecnico = st.text_input("Técnico responsável")
     amostra = st.text_input("Código da amostra")
-
-with st.expander("ℹ️ Ajuda rápida", expanded=False):
-    st.markdown(
-        "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB.\n"
-        "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). Não decide o grupo; apenas qualifica.\n"
-        "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.\n"
-        "- Use **NP** quando o solo for **não-plástico** (IP=0); nesse caso o LL e o LP são ignorados."
-    )
-
     st.divider()
     st.subheader("Planilha-modelo (TRB)")
     # CSV modelo
@@ -97,6 +88,14 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
     except Exception as _e:
         st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 
+
+with st.expander("ℹ️ Ajuda rápida", expanded=False):
+    st.markdown(
+        "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB.\n"
+        "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). Não decide o grupo; apenas qualifica.\n"
+        "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.\n"
+        "- Use **NP** quando o solo for **não-plástico** (IP=0); nesse caso o LL e o LP são ignorados."
+    )
 
 col1, col2 = st.columns([2, 1])
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
