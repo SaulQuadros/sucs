@@ -45,35 +45,13 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
     _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
     st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
                        mime="text/csv", key="dl_model_trb_csv_help")
-    # Excel modelo (gera a partir do _modelo_csv)
+    # Excel modelo
     try:
-        import io
-        _xlsx_buf = io.BytesIO()
-        # Detecta engine disponível
-        _engine = None
-        try:
-            import xlsxwriter  # type: ignore
-            _engine = 'xlsxwriter'
-        except Exception:
-            try:
-                import openpyxl  # type: ignore
-                _engine = 'openpyxl'
-            except Exception:
-                _engine = None
-        if not _engine:
-            raise RuntimeError('Nenhum engine Excel disponível. Instale XlsxWriter ou openpyxl.')
-        with pd.ExcelWriter(_xlsx_buf, engine=_engine) as _xw:
-            _modelo_csv.to_excel(_xw, index=False, sheet_name='modelo_trb')
-        _xlsx_buf.seek(0)
-        st.download_button(
-            'Baixar planilha-modelo (Excel)',
-            data=_xlsx_buf,
-            file_name='modelo_trb.xlsx',
-            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            key='dl_model_trb_xlsx_help',
-        )
+        _xlsx_buf = build_excel_template_bytes_trb()
+        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
     except Exception as _e:
-        st.caption('Não foi possível gerar o modelo em Excel: ' + str(_e))
+        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 
 # === Barra lateral (padrão SUCS) ===
 
@@ -173,13 +151,23 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     return mem
 
 with col1:
-    st.subheader("Entrada (Formulário)")
-    p10  = st.number_input("% passante #10", 0.0, 100.0, step=0.1)
-    p40  = st.number_input("% passante #40", 0.0, 100.0, step=0.1)
-    p200 = st.number_input("% passante #200", 0.0, 100.0, step=0.1)
-    np_  = st.checkbox("IP é NP (não-plástico)?", value=False)
-    ll   = st.number_input("LL (Limite de Liquidez)", 0.0, 200.0, step=0.1, disabled=np_)
-    lp   = st.number_input("LP (Limite de Plasticidade)", 0.0, 200.0, step=0.1, disabled=np_)
+    st.subheader("Granulometria")
+    cg1, cg2, cg3 = st.columns(3)
+    with cg1:
+        p10  = st.number_input("% passante #10", 0.0, 100.0, step=0.1)
+    with cg2:
+        p40  = st.number_input("% passante #40", 0.0, 100.0, step=0.1)
+    with cg3:
+        p200 = st.number_input("% passante #200", 0.0, 100.0, step=0.1)
+
+    st.subheader("Plasticidade (Atterberg)")
+    cp1, cp2, cp3 = st.columns(3)
+    with cp1:
+        np_  = st.checkbox("IP é NP (não-plástico)?", value=False)
+    with cp2:
+        ll   = st.number_input("LL (Limite de Liquidez)", 0.0, 200.0, step=0.1, disabled=np_)
+    with cp3:
+        lp   = st.number_input("LP (Limite de Plasticidade)", 0.0, 200.0, step=0.1, disabled=np_)
     ip_calc = 0.0 if np_ else max(0.0, ll - lp)
     st.caption(f"IP calculado (LL − LP) = **{ip_calc:.2f}**")
 
