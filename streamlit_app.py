@@ -142,13 +142,37 @@ def _resolve_xlsx_engine():
 st.set_page_config(page_title="Classificador SUCS (DNIT)", layout="wide")
 st.title("Classificador SUCS — DNIT")
 
+with st.expander("ℹ️ Ajuda rápida", expanded=False):
+    st.markdown(
+        "- **Fluxo SUCS**: Primeiro verifica-se o teor de finos (% passante #200).\\n"
+        "  - **Coarse (arenas/cascalhos)**: se passante #200 < 50%.\\n"
+        "    - Separação **cascalho** × **areia** pela peneira #4 (pedregulho > #4).\\n"
+        "    - Gradação **bem graduado (W)**/**mal graduado (P)** por **Cu** e **Cc** quando os finos < 5%.\\n"
+        "  - **Finos (siltes/argilas)**: se passante #200 ≥ 50%.\\n"
+        "    - Usa-se **LL/LP** e a **linha A** (IP = 0.73(LL−20)) para definir **M** (abaixo) ou **C** (acima).\\n"
+        "    - Materiais orgânicos (O) e **turfa (Pt)** têm regras específicas.\\n"
+        "- **Observações**: Quando 5% ≤ finos ≤ 12%, combina-se sufixos (por ex., GW-GM). Quando finos > 12%, a classificação é conduzida por plasticidade."
+    )
+    st.divider()
+    st.subheader("Planilha-modelo (SUCS)")
+    try:
+        _xlsx_buf_sucs = build_excel_template_bytes()
+        st.download_button(
+            "Baixar planilha-modelo (Excel)",
+            data=_xlsx_buf_sucs,
+            file_name="SUCS_todos_os_grupos.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            key="dl_model_sucs_xlsx_main",
+        )
+    except Exception as _e:
+        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
+
+
 with st.sidebar:
     st.header("Projeto")
     projeto = st.text_input("Nome do projeto")
     tecnico = st.text_input("Técnico responsável")
     amostra = st.text_input("Código da amostra")
-
-    st.download_button('Baixar planilha‑modelo (Excel)', data=build_excel_template_bytes(), file_name='SUCS_todos_os_grupos.xlsx', mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet')
 
 col1, col2, col3 = st.columns([1.2, 1, 1])
 
