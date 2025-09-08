@@ -3,6 +3,7 @@ import io
 import pandas as pd
 import streamlit as st
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
+
 # --- Excel engine resolver (XLSX) ---
 def _resolve_xlsx_engine():
     """Return a working engine string for pandas.ExcelWriter (prefer xlsxwriter)."""
@@ -16,45 +17,9 @@ def _resolve_xlsx_engine():
         except Exception:
             return None
 
-def build_excel_template_bytes_trb():
-    import io
-    exemplos = [
-        ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
-        ("A-1-b", "Granular bom",               dict(P10=70, P40=45, P200=20, LL=35, LP=29, NP=False)),
-        ("A-3",   "Areia fina NP",              dict(P10=95, P40=80, P200=8,  LL=0,  LP=0,  NP=True)),
-        ("A-2-4", "Granular c/ silte (LL≤40)",  dict(P10=85, P40=60, P200=30, LL=35, LP=27, NP=False)),
-        ("A-2-5", "Granular c/ silte (LL>40)",  dict(P10=85, P40=60, P200=30, LL=45, LP=37, NP=False)),
-        ("A-2-6", "Granular c/ argila (LL≤40)", dict(P10=85, P40=60, P200=30, LL=35, LP=23, NP=False)),
-        ("A-2-7", "Granular c/ argila (LL>40)", dict(P10=85, P40=60, P200=30, LL=45, LP=33, NP=False)),
-        ("A-4",   "Silte LL baixo",             dict(P10=80, P40=60, P200=50, LL=35, LP=27, NP=False)),
-        ("A-5",   "Silte LL alto",              dict(P10=80, P40=60, P200=50, LL=50, LP=40, NP=False)),
-        ("A-6",   "Argila LL baixo",            dict(P10=80, P40=60, P200=50, LL=35, LP=22, NP=False)),
-        ("A-7-5", "Argila LL alto menos plást.",dict(P10=90, P40=70, P200=60, LL=55, LP=35, NP=False)),
-        ("A-7-6", "Argila LL alto mais plást.", dict(P10=90, P40=70, P200=60, LL=55, LP=25, NP=False)),
-    ]
-    rows = []
-    for g, desc, params in exemplos:
-        row = {"Nome do projeto":"", "Técnico responsável":"", "Código da amostra":"",
-               "Grupo_esperado": g, "descricao_sintetica": desc}
-        row.update(params)
-        rows.append(row)
-    df = pd.DataFrame(rows, columns=[
-        "Nome do projeto","Técnico responsável","Código da amostra",
-        "Grupo_esperado","descricao_sintetica","P10","P40","P200","LL","LP","NP"
-    ])
-    bio = io.BytesIO()
-    eng = _resolve_xlsx_engine()
-    if not eng:
-        raise RuntimeError("Nenhum engine Excel disponível. Instale XlsxWriter ou openpyxl.")
-    with pd.ExcelWriter(bio, engine=eng) as xw:
-        df.to_excel(xw, index=False, sheet_name="modelo_trb")
-    bio.seek(0)
-    return bio
-
 
 st.set_page_config(page_title="Classificador TRB - DNIT")
 st.title("Classificador TRB - DNIT")
-
 with st.expander("ℹ️ Ajuda rápida", expanded=False):
     st.markdown(
         "\n".join([
@@ -88,23 +53,7 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
     except Exception as _e:
         st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 
-
 # === Barra lateral (padrão SUCS) ===
-with st.sidebar:
-    st.header("Projeto")
-    projeto = st.text_input("Nome do projeto")
-    tecnico = st.text_input("Técnico responsável")
-    amostra = st.text_input("Código da amostra")
-
-with st.expander("ℹ️ Ajuda rápida", expanded=False):
-    st.markdown(
-        "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB.\n"
-        "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). Não decide o grupo; apenas qualifica.\n"
-        "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.\n"
-        "- Use **NP** quando o solo for **não-plástico** (IP=0); nesse caso o LL e o LP são ignorados."
-    )
-
-col1, col2 = st.columns([2, 1])
 
 def build_excel_template_bytes_trb():
     exemplos = [
@@ -133,14 +82,25 @@ def build_excel_template_bytes_trb():
     ])
     mem = io.BytesIO()
     try:
-        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="modelo_trb")
     except Exception:
-        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="modelo_trb")
     mem.seek(0)
     return mem
 
+
+
+with st.sidebar:
+    st.header("Projeto")
+    projeto = st.text_input("Nome do projeto")
+    tecnico = st.text_input("Técnico responsável")
+    amostra = st.text_input("Código da amostra")
+
+
+
+col1, col2 = st.columns([2, 1])
 def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     preferred = ["Nome do projeto","Técnico responsável","Código da amostra",
                  "P10","P40","P200","LL","LP","IP_calc","Grupo_TRB","IG","Subleito","Materiais constituintes","aviso_ig","relatorio"]
@@ -148,7 +108,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
     df = df[cols]
     mem = io.BytesIO()
     try:
-        with pd.ExcelWriter(mem, engine="xlsxwriter") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="Resultados")
             wb = xw.book
             ws = xw.sheets["Resultados"]
@@ -185,7 +145,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> io.BytesIO:
                 for c in range(1, 5):
                     ws2.set_column(c, c, 12)
     except Exception:
-        with pd.ExcelWriter(mem, engine="openpyxl") as xw:
+        with pd.ExcelWriter(mem, engine=_resolve_xlsx_engine()) as xw:
             df.to_excel(xw, index=False, sheet_name="Resultados")
     mem.seek(0)
     return mem
@@ -221,25 +181,10 @@ with col1:
         except Exception as e:
             st.error(str(e))
 
-with col2:
+    st.divider()
     st.subheader("Lote (CSV / Excel)")
-    modelo_csv = pd.DataFrame([
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
-    ])
-    csv_buf = io.BytesIO(); modelo_csv.to_csv(csv_buf, index=False, encoding="utf-8"); csv_buf.seek(0)
-    st.download_button("Baixar planilha-modelo (CSV)", data=csv_buf, file_name="modelo_trb.csv", mime="text/csv")
-
-    xlsx_buf = build_excel_template_bytes_trb()
-    st.download_button("Baixar planilha-modelo (Excel)", data=xlsx_buf, file_name="modelo_trb.xlsx",
-                       mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+    
+    
     up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv","xlsx"])
     if up is not None:
         try:
@@ -251,26 +196,26 @@ with col2:
                 sep = ';' if head.count(';') > head.count(',') else ','
                 up.seek(0)
                 df = pd.read_csv(up, sep=sep, encoding='utf-8-sig')
-
+    
             # Normaliza NP e injeta metadados da sidebar se não vierem
             if 'NP' in df.columns:
                 df['NP'] = df['NP'].astype(str).str.strip().str.lower().map({
                     'true': True, 'false': False, '1': True, '0': False,
                     'sim': True, 'não': False, 'nao': False, 'np': True
                 }).fillna(False)
-
+    
             for col, val in {"Nome do projeto": projeto, "Técnico responsável": tecnico, "Código da amostra": amostra}.items():
                 if col not in df.columns and val:
                     df[col] = val
-
+    
             out = classify_dataframe_trb(df)
             st.dataframe(out, use_container_width=True)
-
+    
             xlsx_out = build_results_xlsx_trb(out)
             st.download_button("Baixar resultados (XLSX)", data=xlsx_out,
                                file_name="resultado_trb.xlsx",
                                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
+    
             out_csv = io.BytesIO(); out.to_csv(out_csv, index=False, encoding="utf-8"); out_csv.seek(0)
             st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
         except Exception as e:
