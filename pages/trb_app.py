@@ -18,43 +18,6 @@ def _resolve_xlsx_engine():
             return None
 
 
-st.set_page_config(page_title="Classificador TRB - DNIT")
-st.title("Classificador TRB - DNIT")
-with st.expander("ℹ️ Ajuda rápida", expanded=False):
-    st.markdown(
-        "\n".join([
-            "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB (HRB/AASHTO).",
-            "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). **Não decide** o grupo; apenas qualifica.",
-            "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.",
-            "- Use **NP** quando o solo for **não-plástico** (IP = 0); nesse caso o LL e o LP são ignorados.",
-        ])
-    )
-    st.divider()
-    st.subheader("Planilha-modelo (TRB)")
-    # CSV modelo
-    _modelo_csv = pd.DataFrame([
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
-    ])
-    _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
-    st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
-                       mime="text/csv", key="dl_model_trb_csv_help")
-    # Excel modelo
-    try:
-        _xlsx_buf = build_excel_template_bytes_trb()
-        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
-    except Exception as _e:
-        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
-
-# === Barra lateral (padrão SUCS) ===
-
 def build_excel_template_bytes_trb():
     exemplos = [
         ("A-1-a", "Granular de alta qualidade", dict(P10=45, P40=25, P200=10, LL=30, LP=26, NP=False)),
@@ -92,6 +55,43 @@ def build_excel_template_bytes_trb():
 
 
 
+
+st.set_page_config(page_title="Classificador TRB - DNIT")
+st.title("Classificador TRB - DNIT")
+with st.expander("ℹ️ Ajuda rápida", expanded=False):
+    st.markdown(
+        "\n".join([
+            "- O grupo é determinado por **eliminação da esquerda para a direita** na tabela TRB (HRB/AASHTO).",
+            "- O **IG (0–20)** mede a “qualidade” do subleito (0 melhor). **Não decide** o grupo; apenas qualifica.",
+            "- Campos em % devem obedecer: **#200 ≤ #40 ≤ #10 ≤ 100**, e todos em 0–100.",
+            "- Use **NP** quando o solo for **não-plástico** (IP = 0); nesse caso o LL e o LP são ignorados.",
+        ])
+    )
+    st.divider()
+    st.subheader("Planilha-modelo (TRB)")
+    # CSV modelo
+    _modelo_csv = pd.DataFrame([
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
+    ])
+    _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
+    st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
+                       mime="text/csv", key="dl_model_trb_csv_help")
+    # Excel modelo
+    try:
+        _xlsx_buf = build_excel_template_bytes_trb()
+        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
+    except Exception as _e:
+        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
+
+# === Barra lateral (padrão SUCS) ===
 with st.sidebar:
     st.header("Projeto")
     projeto = st.text_input("Nome do projeto")
