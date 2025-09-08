@@ -45,13 +45,35 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
     _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
     st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
                        mime="text/csv", key="dl_model_trb_csv_help")
-    # Excel modelo
+    # Excel modelo (gera a partir do _modelo_csv)
     try:
-        _xlsx_buf = build_excel_template_bytes_trb()
-        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
+        import io
+        _xlsx_buf = io.BytesIO()
+        # Detecta engine disponível
+        _engine = None
+        try:
+            import xlsxwriter  # type: ignore
+            _engine = 'xlsxwriter'
+        except Exception:
+            try:
+                import openpyxl  # type: ignore
+                _engine = 'openpyxl'
+            except Exception:
+                _engine = None
+        if not _engine:
+            raise RuntimeError('Nenhum engine Excel disponível. Instale XlsxWriter ou openpyxl.')
+        with pd.ExcelWriter(_xlsx_buf, engine=_engine) as _xw:
+            _modelo_csv.to_excel(_xw, index=False, sheet_name='modelo_trb')
+        _xlsx_buf.seek(0)
+        st.download_button(
+            'Baixar planilha-modelo (Excel)',
+            data=_xlsx_buf,
+            file_name='modelo_trb.xlsx',
+            mime='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+            key='dl_model_trb_xlsx_help',
+        )
     except Exception as _e:
-        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
+        st.caption('Não foi possível gerar o modelo em Excel: ' + str(_e))
 
 # === Barra lateral (padrão SUCS) ===
 
