@@ -20,6 +20,31 @@ GROUP_DESC = {
     "A-7-6": "Argila (LL alto), IP elevado.",
 }
 
+
+# Faixas de CBR típicas sugeridas por grupo TRB (conforme tabela fornecida)
+TRB_CBR = {
+    "A-1-A": "20–80",
+    "A-1-B": "20–80",
+    "A-3":   "10–40",
+    "A-2-4": "8–30",
+    "A-2-5": "8–30",
+    "A-2-6": "5–20",
+    "A-2-7": "5–20",
+    "A-4":   "5–20",
+    "A-5":   "3–15",
+    "A-6":   "2–10",
+    "A-7-5": "1–5",
+    "A-7-6": "1–4",
+}
+
+import re
+def cbr_for_trb(group: str) -> str | None:
+    if not group:
+        return None
+    k = re.sub(r"\s+", "", group.upper()).replace("_", "-")
+    k = re.sub(r"-+", "-", k)
+    return TRB_CBR.get(k)
+
 def ig_label(ig: int) -> str:
     if ig <= 3:     return "IG baixo (melhor desempenho)"
     if ig <= 9:     return "IG moderado"
@@ -88,6 +113,9 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
         linhas.append(defin)
     linhas.append("")
     linhas.append(f"Materiais constituintes: {get_materiais(group)}")
+    cbr = cbr_for_trb(group)
+    if cbr:
+        linhas.append(f"CBR típico (ISC) sugerido: {cbr}%")
     linhas.append(f"Comportamento como subleito: {subleito}")
     linhas.append("Observação: O IG não define o grupo; apenas qualifica o desempenho do subleito (quanto menor, melhor).")
     return "\n".join(linhas)
