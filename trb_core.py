@@ -79,8 +79,7 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
                      ip: float, is_np: bool, subleito: str, aviso_ig: str) -> str:
     linhas = []
     linhas.append("=== Classificação TRB (HRB/AASHTO) ===")
-    
-        linhas.append(f"Data/hora: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+    linhas.append(f"Data/hora: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     linhas.append(f"Grupo: {group}")
     linhas.append(f"Índice de Grupo (IG): {ig} — {ig_label(ig)}")
     if aviso_ig:
