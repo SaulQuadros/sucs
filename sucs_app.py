@@ -134,7 +134,7 @@ def _resolve_xlsx_engine():
     return bio.getvalue()
 
 
-st.set_page_config(page_title="sucs.app — Classificador SUCS (DNIT)", layout="wide")
+st.set_page_config(page_title="sucs.app", layout="wide")
 st.title("Classificador SUCS — DNIT")
 
 with st.sidebar:
