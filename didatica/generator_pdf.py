@@ -53,24 +53,24 @@ def _make_curve_from_anchors(p4, p10, p40, p200) -> np.ndarray:
     return _ensure_monotone(p_all)
 
 def _sample_LL_LP_for(symbol: str):
-    if symbol in ("GW","GP","SW","SP"):  # limpos
+    if symbol in ("GW","GP","SW","SP"):
         return True, None, None
-    if symbol in ("GM","SM","ML"):       # abaixo da A-line
+    if symbol in ("GM","SM","ML"):
         LL = random.uniform(25.0, 45.0)
         PI_A = _a_line(LL); PI = max(1.0, PI_A - random.uniform(3.0, 8.0))
         LP = max(0.0, LL - PI)
         return False, round(LL, 1), round(LP, 1)
-    if symbol in ("GC","SC","CL"):       # acima da A-line (LL moderado)
+    if symbol in ("GC","SC","CL"):
         LL = random.uniform(28.0, 48.0)
         PI_A = _a_line(LL); PI = PI_A + random.uniform(3.0, 10.0)
         LP = max(0.0, LL - PI)
         return False, round(LL, 1), round(LP, 1)
-    if symbol == "MH":                   # LL alto, abaixo da A-line
+    if symbol == "MH":
         LL = random.uniform(50.0, 70.0)
         PI_A = _a_line(LL); PI = max(1.0, PI_A - random.uniform(3.0, 10.0))
         LP = max(0.0, LL - PI)
         return False, round(LL, 1), round(LP, 1)
-    if symbol == "CH":                   # LL alto, acima da A-line
+    if symbol == "CH":
         LL = random.uniform(50.0, 80.0)
         PI_A = _a_line(LL); PI = PI_A + random.uniform(3.0, 12.0)
         LP = max(0.0, LL - PI)
@@ -84,31 +84,8 @@ def _gen_coarse_clean(symbol: str):
     p40 = min(99.0, p10 + random.uniform(5.0, 30.0))
     p200 = min(4.0, random.uniform(0.0, 4.0))  # finos < 5%
     curve = _make_curve_from_anchors(p4, p10, p40, p200)
-    # Ajuste Cu/Cc (GW/SW bem graduados; GP/SP mal graduados) – simplificado
-    D10 = _interp_D_at_percent(SIEVES_MM, curve, 10.0)
-    D30 = _interp_D_at_percent(SIEVES_MM, curve, 30.0)
-    D60 = _interp_D_at_percent(SIEVES_MM, curve, 60.0)
-    Cu = D60 / max(D10, 1e-6); Cc = (D30**2) / max(D10*D60, 1e-6)
-    if symbol in ("GW","SW"):
-        need_Cu = 4.0 if is_gravel else 6.0
-        for _ in range(6):
-            if (Cu >= need_Cu) and (1.0 <= Cc <= 3.0):
-                break
-            p10 = min(98.0, p4 + random.uniform(8.0, 30.0))
-            p40 = min(99.0, p10 + random.uniform(10.0, 30.0))
-            curve = _make_curve_from_anchors(p4, p10, p40, p200)
-            D10 = _interp_D_at_percent(SIEVES_MM, curve, 10.0)
-            D30 = _interp_D_at_percent(SIEVES_MM, curve, 30.0)
-            D60 = _interp_D_at_percent(SIEVES_MM, curve, 60.0)
-            Cu = D60 / max(D10, 1e-6); Cc = (D30**2) / max(D10*D60, 1e-6)
-    else:
-        need_Cu = 4.0 if is_gravel else 6.0
-        if (Cu >= need_Cu) and (1.0 <= Cc <= 3.0):
-            p10 = p4 + random.uniform(2.0, 8.0)
-            p40 = p10 + random.uniform(2.0, 8.0)
-            curve = _make_curve_from_anchors(p4, p10, p40, p200)
-    meta = {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}
-    return curve, meta
+    # Nota: mantemos a lógica Cu/Cc interna, mas não exibimos no PDF.
+    return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}
 
 def _gen_coarse_with_fines(symbol: str):
     is_gravel = symbol.startswith("G")
@@ -119,8 +96,7 @@ def _gen_coarse_with_fines(symbol: str):
     p200 = min(p200, p40 - 1.0)
     curve = _make_curve_from_anchors(p4, p10, p40, p200)
     np_flag, LL, LP = _sample_LL_LP_for(symbol)
-    meta = {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}
-    return curve, meta, (np_flag, LL, LP)
+    return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}, (np_flag, LL, LP)
 
 def _gen_fine_soil(symbol: str):
     p200 = random.uniform(55.0, 95.0)
@@ -130,8 +106,7 @@ def _gen_fine_soil(symbol: str):
     p4   = min(p4, 99.5)
     curve = _make_curve_from_anchors(p4, p10, p40, p200)
     np_flag, LL, LP = _sample_LL_LP_for(symbol)
-    meta = {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}
-    return curve, meta, (np_flag, LL, LP)
+    return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}, (np_flag, LL, LP)
 
 def generate_random_sucs_pdf(seed: int|None=None) -> Tuple[bytes, Dict[str,str]]:
     if seed is not None:
