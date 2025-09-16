@@ -11,7 +11,6 @@ import io
 import pandas as pd
 import streamlit as st
 import matplotlib.pyplot as plt
-from ui.nav import nav_selector
 
 from sucs_core import classify_sucs, classify_dataframe, LINE_A_SLOPE
 
@@ -137,7 +136,6 @@ def _resolve_xlsx_engine():
 
 st.set_page_config(page_title="Classificador SUCS (DNIT)", layout="wide")
 st.title("Classificador SUCS — DNIT")
-nav_selector('SUCS')  # seletor SUCS/TRB na barra lateral
 
 with st.sidebar:
     st.header("Projeto")
