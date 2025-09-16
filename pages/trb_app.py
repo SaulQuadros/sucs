@@ -184,7 +184,7 @@ with col1:
                         f"Técnico responsável: {tecnico or '-'}\n"
                         f"Código da amostra: {amostra or '-'}\n\n")
             rel = meta_hdr + r.relatorio
-            st.text_area("Relatório (texto)", rel, height=300)
+            st.text(rel)
             mem = io.BytesIO(rel.encode("utf-8"))
             fname = f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt"
             st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
