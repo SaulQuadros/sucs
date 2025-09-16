@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import List, Optional
 
 from trb_defs import get_definicao, get_subleito_text, ig_tipico_max, get_materiais
+from datetime import datetime
 
 # Rótulo rápido por grupo (para UI)
 GROUP_DESC = {
@@ -78,6 +79,8 @@ def _build_relatorio(group: str, ig: int, rationale: List[str],
                      ip: float, is_np: bool, subleito: str, aviso_ig: str) -> str:
     linhas = []
     linhas.append("=== Classificação TRB (HRB/AASHTO) ===")
+    
+        linhas.append(f"Data/hora: {datetime.now().strftime('%Y-%m-%d %H:%M')}")
     linhas.append(f"Grupo: {group}")
     linhas.append(f"Índice de Grupo (IG): {ig} — {ig_label(ig)}")
     if aviso_ig:
