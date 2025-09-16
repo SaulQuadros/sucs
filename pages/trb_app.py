@@ -73,30 +73,29 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
             "- Use **NP** quando o solo for **não-plástico** (IP = 0); nesse caso o LL e o LP são ignorados.",
         ])
     )
-    st.divider()
-    st.subheader("Planilha-modelo (TRB)")
-    # CSV modelo
-    _modelo_csv = pd.DataFrame([
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
-    ])
-    _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
-    st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
-                       mime="text/csv", key="dl_model_trb_csv_help")
-    # Excel modelo
-    try:
-        _xlsx_buf = build_excel_template_bytes_trb()
-        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
-                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
-    except Exception as _e:
-        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
-
+st.divider()
+st.subheader("Planilha-modelo (TRB)")
+# CSV modelo
+_modelo_csv = pd.DataFrame([
+{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+"P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
+{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+"P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
+{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+"P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
+{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+"P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
+])
+_csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
+st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
+mime="text/csv", key="dl_model_trb_csv_help")
+# Excel modelo
+try:
+    _xlsx_buf = build_excel_template_bytes_trb()
+    st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
+    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
+except Exception as _e:
+    st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 # === Barra lateral (padrão SUCS) ===
 with st.sidebar:
     st.header("Projeto")
@@ -196,61 +195,62 @@ ip_calc = 0.0 if np_ else max(0.0, ll - lp)
 st.caption(f"IP calculado (LL − LP) = **{ip_calc:.2f}**")
 
 if st.button("Classificar (TRB)"):
-        try:
-            r = classify_trb(p10, p40, p200, ll, lp, is_np=np_)
-            st.success(f"Grupo TRB: **{r.group}**  |  IG = **{r.ig}** ({ig_label(r.ig)})")
-            st.caption(f"Interpretação TRB: {GROUP_DESC.get(r.group, '—')}")
-            st.caption(f"Comportamento como subleito: **{r.subleito}**")
-            if r.aviso_ig:
-                st.warning(r.aviso_ig)
-            # Cabeçalho de identificação (padrão SUCS)
-            meta_hdr = (f"Nome do projeto: {projeto or '-'}\n"
-                        f"Técnico responsável: {tecnico or '-'}\n"
-                        f"Código da amostra: {amostra or '-'}\n\n")
-            rel = meta_hdr + r.relatorio
-            st.text(rel)
-            mem = io.BytesIO(rel.encode("utf-8"))
-            fname = f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt"
-            st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
-        except Exception as e:
-            st.error(str(e))
+    try:
+        r = classify_trb(p10, p40, p200, ll, lp, is_np=np_)
+        st.success(f"Grupo TRB: **{r.group}**  |  IG = **{r.ig}** ({ig_label(r.ig)})")
+        st.caption(f"Interpretação TRB: {GROUP_DESC.get(r.group, '—')}")
+        st.caption(f"Comportamento como subleito: **{r.subleito}**")
+        if r.aviso_ig:
+            st.warning(r.aviso_ig)
+        # Cabeçalho de identificação (padrão SUCS)
+        meta_hdr = (f"Nome do projeto: {projeto or '-'}\n"
+                    f"Técnico responsável: {tecnico or '-'}\n"
+                    f"Código da amostra: {amostra or '-'}\n\n")
+        rel = meta_hdr + r.relatorio
+        st.text(rel)
+        mem = io.BytesIO(rel.encode("utf-8"))
+        fname = f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt"
+        st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
+    except Exception as e:
+        st.error(str(e))
+st.divider()
+st.subheader("Lote (CSV / Excel)")
+    
+    
+up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv","xlsx"])
+if up is not None:
+    try:
+        name = up.name.lower()
+        if name.endswith(".xlsx"):
+            df = pd.read_excel(up)
+        else:
+            head = up.getvalue()[:4096].decode("utf-8-sig", errors="ignore")
+            sep = ";" if head.count(";") > head.count(",") else ","
+            up.seek(0)
+            df = pd.read_csv(up, sep=sep, encoding="utf-8-sig")
 
-    st.divider()
-    st.subheader("Lote (CSV / Excel)")
-    
-    
-    up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv","xlsx"])
-    if up is not None:
-        try:
-            name = up.name.lower()
-            if name.endswith(".xlsx"):
-                df = pd.read_excel(up)
-            else:
-                head = up.getvalue()[:4096].decode('utf-8-sig', errors='ignore')
-                sep = ';' if head.count(';') > head.count(',') else ','
-                up.seek(0)
-                df = pd.read_csv(up, sep=sep, encoding='utf-8-sig')
-    
-            # Normaliza NP e injeta metadados da sidebar se não vierem
-            if 'NP' in df.columns:
-                df['NP'] = df['NP'].astype(str).str.strip().str.lower().map({
-                    'true': True, 'false': False, '1': True, '0': False,
-                    'sim': True, 'não': False, 'nao': False, 'np': True
-                }).fillna(False)
-    
-            for col, val in {"Nome do projeto": projeto, "Técnico responsável": tecnico, "Código da amostra": amostra}.items():
-                if col not in df.columns and val:
-                    df[col] = val
-    
-            out = classify_dataframe_trb(df)
-            st.dataframe(out, use_container_width=True)
-    
-            xlsx_out = build_results_xlsx_trb(out)
-            st.download_button("Baixar resultados (XLSX)", data=xlsx_out,
-                               file_name="resultado_trb.xlsx",
-                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-    
-            out_csv = io.BytesIO(); out.to_csv(out_csv, index=False, encoding="utf-8"); out_csv.seek(0)
-            st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
-        except Exception as e:
-            st.error(str(e))
+        # Normaliza NP e injeta metadados da sidebar (se não vierem)
+        if "NP" in df.columns:
+            df["NP"] = df["NP"].astype(str).str.strip().str.lower().map({
+                "true": True, "false": False, "1": True, "0": False,
+                "sim": True, "não": False, "nao": False, "np": True
+            }).fillna(False)
+        else:
+            df["NP"] = False
+
+        for col, val in [("Nome do projeto", projeto), ("Técnico responsável", tecnico), ("Código da amostra", amostra)]:
+            if col not in df.columns and val:
+                df[col] = val
+
+        out = classify_dataframe_trb(df)
+        st.dataframe(out, use_container_width=True)
+
+        xlsx_out = build_results_xlsx_trb(out)
+        st.download_button("Baixar resultados (XLSX)", data=xlsx_out,
+                           file_name="resultado_trb.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+        out_csv = io.BytesIO(); out.to_csv(out_csv, index=False, encoding="utf-8"); out_csv.seek(0)
+        st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
+    except Exception as e:
+        st.error(str(e))
