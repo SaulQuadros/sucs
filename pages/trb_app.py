@@ -2,6 +2,7 @@
 import io
 import pandas as pd
 import streamlit as st
+from ui.nav import nav_selector
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 
 # --- Excel engine resolver (XLSX) ---
@@ -58,6 +59,7 @@ def build_excel_template_bytes_trb():
 
 st.set_page_config(page_title="Classificador TRB - DNIT")
 st.title("Classificador TRB - DNIT")
+nav_selector('TRB')  # seletor SUCS/TRB na barra lateral
 with st.expander("ℹ️ Ajuda rápida", expanded=False):
     st.markdown(
         "\n".join([
@@ -184,7 +186,7 @@ with col1:
                         f"Técnico responsável: {tecnico or '-'}\n"
                         f"Código da amostra: {amostra or '-'}\n\n")
             rel = meta_hdr + r.relatorio
-            st.text(rel)
+            st.text_area("Relatório (texto)", rel, height=300)
             mem = io.BytesIO(rel.encode("utf-8"))
             fname = f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt"
             st.download_button("Baixar relatório (.txt)", data=mem, file_name=fname, mime="text/plain")
