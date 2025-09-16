@@ -8,6 +8,52 @@ from datetime import datetime
 LINE_A_SLOPE = 0.73  # IP = 0.73*(LL - 20)
 
 
+# Mapa SUCS → faixa típica de CBR (ISC)
+SUCS_CBR = {
+    "GW": "40–80",
+    "GP": "30–60",
+    "GM": "20–60",
+    "GC": "20–40",
+    "SW": "20–40",
+    "SP": "10–40",
+    "SM": "10–40",
+    "SC": "5–20",
+    "ML": "≤15 (tipicamente 3–15)",
+    "CL": "≤15 (tipicamente 3–10)",
+    "MH": "≤10–15 (comum ≤10)",
+    "CH": "≤15 (tipicamente 3–10)",
+    "OL": "≤5 (muito baixos)",
+    "OH": "≤5 (muito baixos)",
+    "OL/OH": "≤5 (muito baixos)",
+    "PT": "~1–3 (muito baixos; evita-se como subleito)",
+    "PTA": "~1–3 (muito baixos; evita-se como subleito)",
+    "PTB": "~1–3 (muito baixos; evita-se como subleito)",
+}
+
+import re
+def cbr_for_group(grp: str) -> str | None:
+    """Retorna a faixa típica de CBR para a classe SUCS.
+    Trata variações como 'SP-SC', 'CL(ML)', 'OL/OH' etc."""
+    if not grp:
+        return None
+    key = re.sub(r"\s+", "", grp.upper())
+    key = key.replace("/", "-").replace("(", "-").replace(")", "-")
+    key = re.sub(r"-+", "-", key).strip("-")
+    # 1) exato
+    if key in SUCS_CBR:
+        return SUCS_CBR[key]
+    # 2) componentes simples
+    parts = [p for p in key.split("-") if p]
+    for p in parts:
+        if p in SUCS_CBR:
+            return SUCS_CBR[p]
+    # 3) normalizações específicas
+    if key in {"OL-OH", "OH-OL"}:
+        return SUCS_CBR.get("OL/OH")
+    return None
+
+
+
 DNIT_DESC = {
     "GW": "Pedregulhos bem graduados ou misturas de areia de pedregulho, com pouco ou nenhum fino.",
     "GP": "Pedregulhos mal graduados ou misturas de areia e pedregulho, com pouco ou nenhum fino.",
@@ -42,6 +88,9 @@ def _finalize(grp, report):
     desc = dnit_description_for_group(grp)
     if desc:
         report.append(f"Descrição DNIT: {desc}")
+    cbr = cbr_for_group(grp)
+    if cbr:
+        report.append(f"CBR típico (ISC): {cbr}%")
     return grp, "\n".join(report)
 def well_graded_letter(coarse_symbol, Cu, Cc):
     """
