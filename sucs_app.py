@@ -150,7 +150,7 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
             "- O SUCS inicia pela **fração fina (#200)**:",
             "  - Se **% passante #200 < 50%** → material **coarse** (areia/cascalho).",
             "  - Se **% passante #200 ≥ 50%** → material **fino** (siltes/argilas).",
-            "- Para **coarse**:",
+            "- Para **grossa**:",
             "  - Separar **cascalho × areia** na #4 (pedregulho > #4).",
             "  - Quando finos **< 5%**, usar **Cu** e **Cc**: **W** (bem graduado) ou **P** (mal graduado).",
             "  - Quando **5% ≤ finos ≤ 12%**, usar sufixos mistos (**GW-GM**, **SW-SC**, etc.).",
