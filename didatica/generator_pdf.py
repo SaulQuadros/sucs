@@ -22,14 +22,15 @@ SUCS_CLASSES = ["GW","GP","GM","GC","SW","SP","SM","SC","ML","CL","MH","CH"]
 def _a_line(LL: float) -> float:
     return 0.73*(LL - 20.0)
 
-def _ensure_monotone(p: np.ndarray) -> np.ndarray:
+def _ensure_monotone(p):
     out = p.copy()
     for i in range(1, len(out)):
         if out[i] < out[i-1]:
             out[i] = out[i-1]
     return np.clip(out, 0.0, 100.0)
 
-def _interp_D_at_percent(sieves: np.ndarray, pass_pct: np.ndarray, target_pct: float) -> float:
+def _interp_D_at_percent(sieves, pass_pct, target_pct: float) -> float:
+    import numpy as np
     x = np.log10(sieves); y = pass_pct
     if target_pct <= y.min():
         i = int(np.argmin(y)); j = max(i-1, 0)
@@ -44,7 +45,8 @@ def _interp_D_at_percent(sieves: np.ndarray, pass_pct: np.ndarray, target_pct: f
     x_t = x[i] + t*(x[j]-x[i])
     return float(10**x_t)
 
-def _make_curve_from_anchors(p4, p10, p40, p200) -> np.ndarray:
+def _make_curve_from_anchors(p4, p10, p40, p200):
+    import numpy as np
     anchors_D = np.array([75.0, 4.75, 2.0, 0.425, 0.075], dtype=float)
     anchors_P = np.array([100.0, p4,  p10,  p40,  p200], dtype=float)
     x_all = np.log10(SIEVES_MM)[::-1]
@@ -53,6 +55,7 @@ def _make_curve_from_anchors(p4, p10, p40, p200) -> np.ndarray:
     return _ensure_monotone(p_all)
 
 def _sample_LL_LP_for(symbol: str):
+    import random
     if symbol in ("GW","GP","SW","SP"):
         return True, None, None
     if symbol in ("GM","SM","ML"):
@@ -78,16 +81,17 @@ def _sample_LL_LP_for(symbol: str):
     return False, None, None
 
 def _gen_coarse_clean(symbol: str):
+    import random, numpy as np
     is_gravel = symbol.startswith("G")
     p4  = random.uniform(20.0, 45.0) if is_gravel else random.uniform(60.0, 90.0)
     p10 = min(98.0, p4 + random.uniform(5.0, 25.0))
     p40 = min(99.0, p10 + random.uniform(5.0, 30.0))
-    p200 = min(4.0, random.uniform(0.0, 4.0))  # finos < 5%
+    p200 = min(4.0, random.uniform(0.0, 4.0))
     curve = _make_curve_from_anchors(p4, p10, p40, p200)
-    # Nota: mantemos a lógica Cu/Cc interna, mas não exibimos no PDF.
     return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}
 
 def _gen_coarse_with_fines(symbol: str):
+    import random, numpy as np
     is_gravel = symbol.startswith("G")
     p4  = random.uniform(20.0, 45.0) if is_gravel else random.uniform(60.0, 90.0)
     p10 = min(98.0, p4 + random.uniform(10.0, 30.0))
@@ -99,6 +103,7 @@ def _gen_coarse_with_fines(symbol: str):
     return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}, (np_flag, LL, LP)
 
 def _gen_fine_soil(symbol: str):
+    import random, numpy as np
     p200 = random.uniform(55.0, 95.0)
     p40  = max(p200 + random.uniform(2.0, 10.0), min(99.0, p200 + 5.0))
     p10  = max(p40  + random.uniform(2.0, 10.0), min(99.0, p40  + 5.0))
@@ -109,6 +114,7 @@ def _gen_fine_soil(symbol: str):
     return curve, {"P4": float(p4), "P10": float(p10), "P40": float(p40), "P200": float(p200)}, (np_flag, LL, LP)
 
 def generate_random_sucs_pdf(seed: int|None=None) -> Tuple[bytes, Dict[str,str]]:
+    import numpy as np, random, datetime
     if seed is not None:
         random.seed(seed); np.random.seed(seed)
     symbol = random.choice(SUCS_CLASSES)
@@ -120,7 +126,7 @@ def generate_random_sucs_pdf(seed: int|None=None) -> Tuple[bytes, Dict[str,str]]
         curve, meta, (np_flag, LL, LP) = _gen_fine_soil(symbol)
     buf = io.BytesIO()
     with PdfPages(buf) as pdf:
-        fig = plt.figure(figsize=(11.69, 8.27))  # A4 landscape
+        fig = plt.figure(figsize=(11.69, 8.27))
         now = datetime.datetime.now()
         amostra = f"E{random.randint(100,999)}"
         fig.suptitle("FICHA GEOTÉCNICA – AMOSTRA", fontsize=14, fontweight="bold", y=0.98)
@@ -130,20 +136,17 @@ def generate_random_sucs_pdf(seed: int|None=None) -> Tuple[bytes, Dict[str,str]]
             f"Observação: Ficha didática gerada automaticamente – use o App para classificar."
         )
         fig.text(0.03, 0.88, header_text, fontsize=10, va="top")
-        # Atterberg (sem PI)
         if np_flag:
             att_text = "Limites de Atterberg: NP (não plástico)"
         else:
             att_text = f"Limites de Atterberg: LL = {LL:.1f}  |  LP = {LP:.1f}"
         fig.text(0.03, 0.78, att_text, fontsize=10, va="top")
-        # Tabela peneiras
         table_data = [["Peneira", "% Passante"]]
         for lbl, mm, p in zip(SIEVES_LBL, SIEVES_MM, curve):
             table_data.append([lbl, f"{p:.1f}"])
         ax_table = fig.add_axes([0.03, 0.08, 0.42, 0.65]); ax_table.axis("off")
         the_table = ax_table.table(cellText=table_data, loc="center", cellLoc="center")
         the_table.auto_set_font_size(False); the_table.set_fontsize(9); the_table.scale(1.2, 1.4)
-        # Curva granulométrica
         ax = fig.add_axes([0.50, 0.12, 0.47, 0.70])
         ax.set_xscale("log"); ax.set_xlim(0.05, 100); ax.set_ylim(0, 100)
         ax.grid(True, which="both", linestyle="--", alpha=0.4)
