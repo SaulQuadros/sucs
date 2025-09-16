@@ -4,6 +4,12 @@ import pandas as pd
 import streamlit as st
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
 
+# Callback para marcar que o usuário interagiu com o checkbox NP
+def _np_mark_user_set():
+    import streamlit as st
+    st.session_state['np_user_set'] = True
+
+
 # --- Excel engine resolver (XLSX) ---
 def _resolve_xlsx_engine():
     """Return a working engine string for pandas.ExcelWriter (prefer xlsxwriter)."""
@@ -160,18 +166,36 @@ with col1:
     with cg3:
         p200 = st.number_input("% passante #200", 0.0, 100.0, step=0.1)
 
-    st.subheader("Plasticidade (Atterberg)")
-    cp1, cp2, cp3 = st.columns(3)
-    with cp1:
-        np_  = st.checkbox("IP é NP (não-plástico)?", value=False)
-    with cp2:
-        ll   = st.number_input("LL (Limite de Liquidez)", 0.0, 200.0, step=0.1, disabled=np_)
-    with cp3:
-        lp   = st.number_input("LP (Limite de Plasticidade)", 0.0, 200.0, step=0.1, disabled=np_)
-    ip_calc = 0.0 if np_ else max(0.0, ll - lp)
-    st.caption(f"IP calculado (LL − LP) = **{ip_calc:.2f}**")
+        st.subheader("Plasticidade (Atterberg)")
+cp1, cp2, cp3 = st.columns(3)
+# Lógica: NP só é permitido se P40 >= 51% e P200 <= 10%
+np_allowed = (p40 >= 51.0) and (p200 <= 10.0)
+# Estado inicial e comportamento em função das condições
+if "np_checkbox" not in st.session_state:
+    st.session_state["np_checkbox"] = False
+if "np_user_set" not in st.session_state:
+    st.session_state["np_user_set"] = False
+# Se não permitido, força False e limpa override do usuário
+if not np_allowed:
+    st.session_state["np_checkbox"] = False
+    st.session_state["np_user_set"] = False
+else:
+    # Permitido: se usuário ainda não interagiu, marcar automaticamente como True
+    if not st.session_state.get("np_user_set", False):
+        st.session_state["np_checkbox"] = True
 
-    if st.button("Classificar (TRB)"):
+with cp1:
+    np_ = st.checkbox("IP é NP (não-plástico)?", key="np_checkbox",
+                      disabled=not np_allowed,
+                      on_change=_np_mark_user_set if np_allowed else None)
+with cp2:
+    ll   = st.number_input("LL (Limite de Liquidez)", 0.0, 200.0, step=0.1, disabled=np_)
+with cp3:
+    lp   = st.number_input("LP (Limite de Plasticidade)", 0.0, 200.0, step=0.1, disabled=np_)
+ip_calc = 0.0 if np_ else max(0.0, ll - lp)
+st.caption(f"IP calculado (LL − LP) = **{ip_calc:.2f}**")
+
+if st.button("Classificar (TRB)"):
         try:
             r = classify_trb(p10, p40, p200, ll, lp, is_np=np_)
             st.success(f"Grupo TRB: **{r.group}**  |  IG = **{r.ig}** ({ig_label(r.ig)})")
