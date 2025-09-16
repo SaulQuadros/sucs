@@ -1,6 +1,5 @@
 # pages/trb_app.py
 import io
-from didatica.generator_pdf import generate_random_sucs_pdf
 import pandas as pd
 import streamlit as st
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label
@@ -74,29 +73,36 @@ with st.expander("ℹ️ Ajuda rápida", expanded=False):
             "- Use **NP** quando o solo for **não-plástico** (IP = 0); nesse caso o LL e o LP são ignorados.",
         ])
     )
+    st.markdown("---")
+    st.subheader("Planilha-modelo (TRB)")
+
+    # CSV modelo
+    _modelo_csv = pd.DataFrame([
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
+        {"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
+         "P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
+    ])
+    _csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
+    st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
+                       mime="text/csv", key="dl_model_trb_csv_help")
+
+    # Excel modelo
+    try:
+        _xlsx_buf = build_excel_template_bytes_trb()
+        st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
+                           mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                           key="dl_model_trb_xlsx_help")
+    except Exception as _e:
+        st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
+
 st.divider()
-st.subheader("Planilha-modelo (TRB)")
-# CSV modelo
-_modelo_csv = pd.DataFrame([
-{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-"P10": 60, "P40": 45, "P200": 8,  "LL": 28, "LP": 24, "NP": True},
-{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-"P10": 80, "P40": 50, "P200": 20, "LL": 35, "LP": 29, "NP": False},
-{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-"P10": 90, "P40": 70, "P200": 30, "LL": 42, "LP": 30, "NP": False},
-{"Nome do projeto": "", "Técnico responsável": "", "Código da amostra": "",
-"P10": 95, "P40": 80, "P200": 50, "LL": 38, "LP": 26, "NP": False},
-])
-_csv_buf = io.BytesIO(); _modelo_csv.to_csv(_csv_buf, index=False, encoding="utf-8"); _csv_buf.seek(0)
-st.download_button("Baixar planilha-modelo (CSV)", data=_csv_buf, file_name="modelo_trb.csv",
-mime="text/csv", key="dl_model_trb_csv_help")
-# Excel modelo
-try:
-    _xlsx_buf = build_excel_template_bytes_trb()
-    st.download_button("Baixar planilha-modelo (Excel)", data=_xlsx_buf, file_name="modelo_trb.xlsx",
-    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", key="dl_model_trb_xlsx_help")
-except Exception as _e:
-    st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
+# === Barra lateral (padrão SUCS) ===
+
 # === Barra lateral (padrão SUCS) ===
 with st.sidebar:
     st.header("Projeto")
@@ -166,7 +172,7 @@ with col1:
     with cg3:
         p200 = st.number_input("% passante #200", 0.0, 100.0, step=0.1)
 
-        st.subheader("Plasticidade (Atterberg)")
+        st.subheader("Limites de Atterberg")
 cp1, cp2, cp3 = st.columns(3)
 # Lógica: NP só é permitido se P40 >= 51% e P200 <= 10%
 np_allowed = (p40 >= 51.0) and (p200 <= 10.0)
@@ -255,24 +261,3 @@ if up is not None:
         st.download_button("Baixar resultados (CSV)", data=out_csv, file_name="resultado_trb.csv", mime="text/csv")
     except Exception as e:
         st.error(str(e))
-
-
-# === Didática: Gerar Ficha (PDF) ===
-try:
-    import streamlit as st
-    with st.sidebar.expander("🧪 Gerar Ficha (PDF)", expanded=False):
-        st.caption("Gera uma ficha aleatória (SUCS) com curva granulométrica. Uma por vez.")
-        if st.button("Gerar ficha (PDF)", key="didatica_btn_pdf"):
-            _pdf_bytes, _meta = generate_random_sucs_pdf()
-            st.success("Ficha gerada. Faça o download abaixo.")
-            st.download_button("Baixar Ficha (PDF)",
-                               data=_pdf_bytes,
-                               file_name=f"Ficha_{_meta['amostra']}.pdf",
-                               mime="application/pdf",
-                               key="didatica_dl_pdf")
-except Exception as _e:
-    try:
-        st.sidebar.caption(f"Não foi possível habilitar o gerador de ficha: {_e}")
-    except Exception:
-        pass
-
