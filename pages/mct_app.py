@@ -12,6 +12,18 @@ from didatica.mct_examples import build_excel_template_bytes_mct
 
 # NÃO chamar st.set_page_config aqui (evita conflito com o script principal)
 
+# ----------------------
+# Sidebar - Identificação
+# ----------------------
+def sidebar_meta() -> dict:
+    st.sidebar.markdown("### 📄 Identificação")
+    projeto = st.sidebar.text_input("Nome do projeto", key="mct_meta_projeto")
+    tecnico = st.sidebar.text_input("Técnico responsável", key="mct_meta_tecnico")
+    amostra = st.sidebar.text_input("Código da amostra", key="mct_meta_amostra")
+    return {"projeto": projeto.strip() if projeto else "",
+            "tecnico": tecnico.strip() if tecnico else "",
+            "amostra": amostra.strip() if amostra else ""}
+
 def _number_input(label, value=None, min_value=None, max_value=None, step=0.01, help=None, key=None):
     return st.number_input(label, value=value, min_value=min_value, max_value=max_value,
                            step=step, format="%.6f", help=help, key=key)
@@ -22,9 +34,17 @@ def _decimal_br(x) -> str:
     except Exception:
         return str(x)
 
-def ui_modo_rapido():
+def _ident_caption(meta: dict):
+    if not meta: return
+    proj = meta.get("projeto") or "—"
+    tec = meta.get("tecnico") or "—"
+    ams = meta.get("amostra") or "—"
+    st.caption(f"**Projeto:** {proj}  |  **Técnico:** {tec}  |  **Amostra:** {ams}")
+
+def ui_modo_rapido(meta: dict):
     st.subheader("⚡ Modo Rápido")
     st.markdown("Informe **C'** e **e'**, ou informe **d'** e **Pi** que eu calculo **e'**.")
+    _ident_caption(meta)
 
     col1, col2, col3 = st.columns([1, 1, 1])
     with col1:
@@ -44,7 +64,7 @@ def ui_modo_rapido():
 
     if st.button("Classificar (MCT)"):
         try:
-            inp = MCTInput(C_=C_, e_=e_ if e_ > 0 else None, d_=d_ if d_ > 0 else None, Pi=Pi if Pi > 0 else None)
+            inp = MCTInput(C_=C_, e_=e_ if e_ > 0 else None, d_=d_ if d_ > 0 else None, Pi=Pi if Pi > 0 else None, meta=meta)
             result = classify_from_inputs(inp, allow_demo=demo)
 
             st.markdown(f"### Resultado: **{result.group}** {'🧪' if result.is_demo else '✅'}")
@@ -68,9 +88,10 @@ def ui_modo_rapido():
         except Exception as ex:
             st.error(f"Erro ao classificar: {ex}")
 
-def ui_modo_completo():
+def ui_modo_completo(meta: dict):
     st.subheader("🧪 Modo Completo (Laboratório) — esqueleto pronto")
     st.caption("Faça upload das leituras para extrair C', d', Pi → e'. Esta versão inicial contém o esqueleto.")
+    _ident_caption(meta)
 
     with st.expander("Modelo de planilha (MCT)"):
         if st.button("Baixar planilha-modelo (Excel)"):
@@ -97,12 +118,15 @@ def ui_modo_completo():
 
 def main():
     st.title("Classificação de Solos — Método MCT (Nogami & Villibor)")
-    st.markdown("Este módulo está isolado dos demais (SUCS/TRB). Ele traz as assinaturas, validações e o esqueleto do ábaco. A lógica oficial do ábaco e a expressão de e' serão conectadas na fase seguinte, com base no Manual do DNIT.")
+    st.markdown("Este módulo está **isolado** dos demais (SUCS/TRB). Ele traz as **assinaturas, validações** e o **esqueleto do ábaco**. A lógica oficial do ábaco e a expressão de e' serão conectadas na fase seguinte, com base no Manual do DNIT.")
+
+    meta = sidebar_meta()
+
     modo = st.radio("Escolha o modo", ["Rápido", "Completo (Laboratório)"], horizontal=True)
     if modo == "Rápido":
-        ui_modo_rapido()
+        ui_modo_rapido(meta)
     else:
-        ui_modo_completo()
+        ui_modo_completo(meta)
 
 if __name__ == "__main__":
     main()
