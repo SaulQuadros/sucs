@@ -2,6 +2,8 @@
 # Identificação do projeto na barra lateral, compartilhada por todas as páginas do app.
 import streamlit as st
 
+from estado import keep
+
 CAMPOS = (("projeto", "Nome do projeto"), ("tecnico", "Técnico responsável"), ("amostra", "Código da amostra"))
 
 
@@ -10,7 +12,7 @@ def render_sidebar() -> None:
     with st.sidebar:
         st.header("Projeto")
         for chave, rotulo in CAMPOS:
-            st.text_input(rotulo, key=f"meta_{chave}")
+            st.text_input(rotulo, **keep(f"meta_{chave}", ""))
 
 
 def get_meta() -> dict:

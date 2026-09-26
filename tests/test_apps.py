@@ -68,3 +68,66 @@ def test_projeto_persiste_entre_paginas():
     at.switch_page("paginas/mct.py").run()
     assert not at.exception, at.exception
     assert at.text_input(key="meta_projeto").value == "BR-393"
+
+
+# --- Preservação do que foi preenchido ao navegar pelo menu -----------------------------------
+
+def _ir(at, pagina):
+    at.switch_page(pagina).run()
+    assert not at.exception, at.exception
+
+
+def test_campos_preservados_ao_navegar_entre_as_tres_paginas():
+    at = _app("sucs_app.py")
+    at.number_input(key="sucs_ret200").set_value(70.0).run()
+    at.number_input(key="sucs_pedregulho").set_value(60.0)
+    at.number_input(key="sucs_ll").set_value(40.0)
+    at.number_input(key="sucs_lp").set_value(20.0).run()
+    _ir(at, "paginas/trb.py")
+    at.number_input(key="trb_p200").set_value(30.0)
+    at.checkbox(key="trb_np").check().run()
+    _ir(at, "paginas/mct.py")
+    at.radio(key="mct_modo_e").set_value("Informar e' diretamente").run()
+    at.number_input(key="mct_e").set_value(1.3)
+    at.number_input(key="mct_c").set_value(0.9).run()
+    _ir(at, "paginas/sucs.py")
+    assert at.number_input(key="sucs_ret200").value == 70.0
+    assert at.number_input(key="sucs_pedregulho").value == 60.0
+    assert (at.number_input(key="sucs_ll").value, at.number_input(key="sucs_lp").value) == (40.0, 20.0)
+    _ir(at, "paginas/trb.py")
+    assert at.number_input(key="trb_p200").value == 30.0 and at.checkbox(key="trb_np").value is True
+    _ir(at, "paginas/mct.py")
+    assert at.radio(key="mct_modo_e").value == "Informar e' diretamente"
+    assert at.number_input(key="mct_e").value == 1.3 and at.number_input(key="mct_c").value == 0.9
+
+
+def test_campo_condicional_volta_com_o_valor():
+    at = _app("sucs_app.py")
+    at.number_input(key="sucs_ret200").set_value(70.0).run()
+    at.number_input(key="sucs_pedregulho").set_value(60.0).run()
+    at.number_input(key="sucs_ret200").set_value(30.0).run()     # solo fino: campo some
+    at.number_input(key="sucs_ret200").set_value(70.0).run()     # volta a ser grosso
+    assert at.number_input(key="sucs_pedregulho").value == 60.0
+
+
+def test_resultado_preservado_e_marcado_quando_desatualizado():
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/trb.py")
+    for k, v in [("trb_p10", 80.0), ("trb_p40", 60.0), ("trb_p200", 30.0), ("trb_ll", 30.0), ("trb_lp", 19.5)]:
+        at.number_input(key=k).set_value(v)
+    at.run()
+    _click(at, "Classificar")
+    _ir(at, "paginas/mct.py")
+    _ir(at, "paginas/trb.py")
+    assert "A-2-6" in at.success[0].value and not at.warning
+    at.number_input(key="trb_ll").set_value(45.0).run()
+    assert any("alterados" in w.value for w in at.warning)
+
+
+def test_resultado_mct_preservado():
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/mct.py")
+    _click(at, "Classificar")
+    _ir(at, "paginas/sucs.py")
+    _ir(at, "paginas/mct.py")
+    assert any("LA'" in m.value for m in at.markdown)

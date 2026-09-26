@@ -8,6 +8,7 @@ import streamlit as st
 from didatica.generator_pdf import generate_random_sucs_pdf
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label, EXEMPLOS
 from trb_defs import cbr_for_trb, sucs_provavel
+from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
 from projeto import get_meta
 from xlsx_utils import resolve_xlsx_engine, to_xlsx_bytes
 
@@ -78,20 +79,33 @@ projeto, tecnico, amostra = meta["projeto"], meta["tecnico"], meta["amostra"]
 
 st.subheader("Granulometria (% passante)")
 cg1, cg2, cg3 = st.columns(3)
-p10 = cg1.number_input("% passante #10", 0.0, 100.0, step=0.1)
-p40 = cg2.number_input("% passante #40", 0.0, 100.0, step=0.1)
-p200 = cg3.number_input("% passante #200", 0.0, 100.0, step=0.1)
+p10 = cg1.number_input("% passante #10", 0.0, 100.0, step=0.1, **keep("trb_p10", 0.0))
+p40 = cg2.number_input("% passante #40", 0.0, 100.0, step=0.1, **keep("trb_p40", 0.0))
+p200 = cg3.number_input("% passante #200", 0.0, 100.0, step=0.1, **keep("trb_p200", 0.0))
 
 st.subheader("Plasticidade (Atterberg)")
 cp1, cp2, cp3 = st.columns(3)
-np_ = cp1.checkbox("Não plástico (NP)")
-ll = cp2.number_input("LL (Limite de Liquidez)", 0.0, 300.0, step=0.1)
-lp = cp3.number_input("LP (Limite de Plasticidade)", 0.0, 300.0, step=0.1, disabled=np_)
+np_ = cp1.checkbox("Não plástico (NP)", **keep("trb_np", False))
+ll = cp2.number_input("LL (Limite de Liquidez)", 0.0, 300.0, step=0.1, **keep("trb_ll", 0.0))
+lp = cp3.number_input("LP (Limite de Plasticidade)", 0.0, 300.0, step=0.1, disabled=np_, **keep("trb_lp", 0.0))
 st.caption("IP = **NP**" if np_ else f"IP calculado (LL − LP) = **{ll - lp:.2f}**")
 
+entrada = {"p10": p10, "p40": p40, "p200": p200, "ll": ll, "lp": 0.0 if np_ else lp, "np": np_}
 if st.button("Classificar (TRB)", type="primary"):
     try:
-        r = classify_trb(p10, p40, p200, ll, 0.0 if np_ else lp, is_np=np_)
+        salvar_resultado("trb", entrada, classify_trb(entrada["p10"], entrada["p40"], entrada["p200"],
+                                                      entrada["ll"], entrada["lp"], is_np=np_))
+    except Exception as e:
+        salvar_resultado("trb", entrada, str(e))
+
+ultimo = ultimo_resultado("trb", entrada)
+if ultimo:
+    r, desatualizado = ultimo
+    if desatualizado:
+        aviso_desatualizado()
+    if isinstance(r, str):
+        st.error(r)
+    else:
         st.success(f"Grupo TRB: **{r.group}**  |  IG = **{r.ig}** ({ig_label(r.ig)})")
         st.caption(f"Interpretação TRB: {GROUP_DESC.get(r.group, '—')}")
         st.caption(f"Comportamento como subleito: **{r.subleito}**  |  "
@@ -105,41 +119,41 @@ if st.button("Classificar (TRB)", type="primary"):
         st.text(rel)
         st.download_button("Baixar relatório (.txt)", data=rel.encode("utf-8"),
                            file_name=f"TRB_{(amostra or 'amostra').replace(' ', '_')}.txt", mime="text/plain")
-    except Exception as e:
-        st.error(str(e))
+
+
+def _processar_lote(df):
+    if "NP" in df.columns:
+        df["NP"] = df["NP"].astype(str).str.strip().str.lower().map({
+            "true": True, "false": False, "1": True, "0": False, "1.0": True, "0.0": False,
+            "sim": True, "não": False, "nao": False, "np": True}).fillna(False)
+    else:
+        df["NP"] = False
+    for col, val in zip(META_COLS, (projeto, tecnico, amostra)):
+        if col not in df.columns and val:
+            df[col] = val
+    out = classify_dataframe_trb(df)
+    if "Grupo_esperado" in out.columns:
+        out.insert(0, "confere", out["Grupo_esperado"].astype(str) == out["Grupo_TRB"].astype(str))
+    return out
+
 
 st.divider()
 st.subheader("Lote (CSV / Excel)")
-up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv", "xlsx"])
-if up is not None:
-    try:
-        if up.name.lower().endswith(".xlsx"):
-            df = pd.read_excel(up)
-        else:
-            head = up.getvalue()[:4096].decode("utf-8-sig", errors="ignore")
-            sep = ";" if head.count(";") > head.count(",") else ","
-            up.seek(0)
-            df = pd.read_csv(up, sep=sep, encoding="utf-8-sig")
-        if "NP" in df.columns:
-            df["NP"] = df["NP"].astype(str).str.strip().str.lower().map({
-                "true": True, "false": False, "1": True, "0": False, "1.0": True, "0.0": False,
-                "sim": True, "não": False, "nao": False, "np": True}).fillna(False)
-        else:
-            df["NP"] = False
-        for col, val in zip(META_COLS, (projeto, tecnico, amostra)):
-            if col not in df.columns and val:
-                df[col] = val
-        out = classify_dataframe_trb(df)
-        if "Grupo_esperado" in out.columns:
-            out.insert(0, "confere", out["Grupo_esperado"].astype(str) == out["Grupo_TRB"].astype(str))
+up = st.file_uploader("Enviar CSV (ou Excel .xlsx)", type=["csv", "xlsx"], key="trb_lote")
+try:
+    res_lote = lote("trb", up, _processar_lote)
+    if res_lote:
+        out, nome, reaproveitado = res_lote
+        if reaproveitado:
+            st.caption(f"Último lote processado: **{nome}**")
         st.dataframe(out, use_container_width=True)
         st.download_button("Baixar resultados (XLSX)", data=build_results_xlsx_trb(out),
                            file_name="resultado_trb.xlsx",
                            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         st.download_button("Baixar resultados (CSV)", data=out.to_csv(index=False).encode("utf-8"),
                            file_name="resultado_trb.csv", mime="text/csv")
-    except Exception as e:
-        st.error(str(e))
+except Exception as e:
+    st.error(str(e))
 
 # === Didática: ficha de exercício (PDF) ===
 with st.sidebar.expander("🧪 Gerar ficha de exercício (PDF)", expanded=False):
@@ -147,8 +161,11 @@ with st.sidebar.expander("🧪 Gerar ficha de exercício (PDF)", expanded=False)
                "para exercício de classificação TRB e SUCS.")
     if st.button("Gerar ficha (PDF)", key="didatica_btn_pdf"):
         try:
-            _pdf_bytes, _meta = generate_random_sucs_pdf()
-            st.download_button("Baixar ficha (PDF)", data=_pdf_bytes, file_name=f"Ficha_{_meta['amostra']}.pdf",
-                               mime="application/pdf", key="didatica_dl_pdf")
+            st.session_state["__ficha_pdf__"] = generate_random_sucs_pdf()
         except Exception as _e:
             st.caption(f"Não foi possível gerar a ficha: {_e}")
+    if "__ficha_pdf__" in st.session_state:
+        _pdf_bytes, _meta = st.session_state["__ficha_pdf__"]
+        st.download_button(f"Baixar ficha {_meta['amostra']} (PDF)", data=_pdf_bytes,
+                           file_name=f"Ficha_{_meta['amostra']}.pdf", mime="application/pdf",
+                           key="didatica_dl_pdf")

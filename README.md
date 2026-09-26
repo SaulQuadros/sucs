@@ -40,6 +40,11 @@ O menu fica na barra superior. Cada chave de `MENUS` em `sucs_app.py` é um menu
 (hoje: **Classificação de Solos** → SUCS, TRB, MCT). Novos módulos entram como novas chaves.
 Para usar o menu lateral em vez da barra superior, troque `position="top"` por `position="sidebar"`.
 
+A barra superior define o conteúdo da página; a barra lateral traz informações complementares (projeto).
+O que o usuário preenche é preservado ao trocar de página (`estado.py`): todo widget de entrada deve usar
+`**keep("chave_unica", valor_padrão)` em vez de `value=`/`index=`. O último resultado de cada página e o
+último lote processado também são mantidos; se os dados mudarem depois da classificação, o app avisa.
+
 ## ⚙️ Regras implementadas (resumo)
 
 **SUCS**
@@ -67,6 +72,7 @@ Para usar o menu lateral em vez da barra superior, troque `position="top"` por `
 ```
 sucs_app.py            ponto de entrada: menu superior (MENUS) e barra lateral do projeto
 projeto.py             identificação do projeto, compartilhada entre as páginas
+estado.py              preserva campos, resultados e lotes ao navegar pelo menu
 paginas/sucs.py        página SUCS
 paginas/trb.py         página TRB
 paginas/mct.py         página MCT

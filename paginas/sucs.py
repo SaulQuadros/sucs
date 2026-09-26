@@ -9,6 +9,7 @@ import streamlit as st
 
 from sucs_core import (classify_sucs, classify_dataframe, cu_cc, line_a,
                        LINE_A_SLOPE, HATCH_IP, LL_LH, EXEMPLOS)
+from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
 from projeto import get_meta
 from xlsx_utils import to_xlsx_bytes
 
@@ -89,12 +90,14 @@ col1, col2, col3 = st.columns([1.2, 1.2, 1])
 
 with col1:
     st.subheader("Granulometria")
-    pct_retido_200 = st.number_input("% retido na peneira #200", 0.0, 100.0, step=0.1)
+    pct_retido_200 = st.number_input("% retido na peneira #200", 0.0, 100.0, step=0.1,
+                                     **keep("sucs_ret200", 0.0))
     fines = 100.0 - pct_retido_200
     coarse = pct_retido_200 > 50.0
     st.caption(f"% de finos (passando na #200) = {fines:.1f}% → granulação {'grossa' if coarse else 'fina'}")
     if coarse:
-        pct_pedregulho = st.number_input("% de pedregulho (> #4) na fração graúda", 0.0, 100.0, step=0.1)
+        pct_pedregulho = st.number_input("% de pedregulho (> #4) na fração graúda", 0.0, 100.0, step=0.1,
+                                         **keep("sucs_pedregulho", 0.0))
         pct_areia = 100.0 - pct_pedregulho
         st.caption(f"% de areia (entre #4 e #200) na fração graúda = {pct_areia:.1f}%")
     else:
@@ -104,27 +107,28 @@ with col1:
     Cu = Cc = D10 = D30 = D60 = None
     if allowed_grad:
         st.markdown("**Graduação (W/P)**")
-        modo_grad = st.radio("Informar", ["D10, D30, D60 (mm)", "Cu e Cc", "Não informar"], horizontal=True)
+        modo_grad = st.radio("Informar", ["D10, D30, D60 (mm)", "Cu e Cc", "Não informar"], horizontal=True,
+                             **keep("sucs_modo_grad", "D10, D30, D60 (mm)"))
         if modo_grad.startswith("D10"):
             c1, c2, c3 = st.columns(3)
-            D10 = c1.number_input("D10", 0.0, 100.0, value=0.10, step=0.01, format="%.3f")
-            D30 = c2.number_input("D30", 0.0, 100.0, value=0.30, step=0.01, format="%.3f")
-            D60 = c3.number_input("D60", 0.0, 100.0, value=0.90, step=0.01, format="%.3f")
+            D10 = c1.number_input("D10", 0.0, 100.0, step=0.01, format="%.3f", **keep("sucs_d10", 0.10))
+            D30 = c2.number_input("D30", 0.0, 100.0, step=0.01, format="%.3f", **keep("sucs_d30", 0.30))
+            D60 = c3.number_input("D60", 0.0, 100.0, step=0.01, format="%.3f", **keep("sucs_d60", 0.90))
             _cu, _cc = cu_cc(D10, D30, D60)
             if _cu is not None:
                 st.caption(f"Cu = {_cu:.2f} ; Cc = {_cc:.2f}")
         elif modo_grad == "Cu e Cc":
             c1, c2 = st.columns(2)
-            Cu = c1.number_input("Cu", 0.0, 1000.0, value=6.0, step=0.1)
-            Cc = c2.number_input("Cc", 0.0, 1000.0, value=1.5, step=0.01)
+            Cu = c1.number_input("Cu", 0.0, 1000.0, step=0.1, **keep("sucs_cu", 6.0))
+            Cc = c2.number_input("Cc", 0.0, 1000.0, step=0.01, **keep("sucs_cc", 1.5))
     elif coarse:
         st.caption("Finos > 12%: a graduação (W/P) não entra na classificação.")
 
 with col2:
     st.subheader("Plasticidade (Atterberg)")
-    NP = st.checkbox("Não plástico (NP)")
-    LL = st.number_input("Limite de Liquidez (LL)", 0.0, 300.0, step=0.1, disabled=NP)
-    LP = st.number_input("Limite de Plasticidade (LP)", 0.0, 300.0, step=0.1, disabled=NP)
+    NP = st.checkbox("Não plástico (NP)", **keep("sucs_np", False))
+    LL = st.number_input("Limite de Liquidez (LL)", 0.0, 300.0, step=0.1, disabled=NP, **keep("sucs_ll", 0.0))
+    LP = st.number_input("Limite de Plasticidade (LP)", 0.0, 300.0, step=0.1, disabled=NP, **keep("sucs_lp", 0.0))
     IP = 0.0 if NP else LL - LP
     st.metric("IP = LL − LP", "NP" if NP else f"{IP:.2f}")
     st.pyplot(plot_plasticidade(LL, IP, NP))
@@ -133,43 +137,57 @@ with col3:
     st.subheader("Matéria orgânica")
     organico = st.checkbox("Evidência orgânica (cor escura, odor, queda do LL após secagem em estufa)",
                            disabled=coarse,
-                           help="Aplica-se a solos finos abaixo da linha A (OL se LL ≤ 50, OH se LL > 50).")
-    turfa = st.checkbox("Altamente orgânico, fibroso (turfa)", help="Classifica como PT.")
+                           help="Aplica-se a solos finos abaixo da linha A (OL se LL ≤ 50, OH se LL > 50).",
+                           **keep("sucs_organico", False))
+    turfa = st.checkbox("Altamente orgânico, fibroso (turfa)", help="Classifica como PT.",
+                        **keep("sucs_turfa", False))
+
+entrada = {"pct_retido_200": pct_retido_200,
+           "pct_pedregulho_coarse": pct_pedregulho, "pct_areia_coarse": pct_areia,
+           "LL": None if NP else LL, "LP": None if NP else LP, "NP": NP,
+           "Cu": Cu, "Cc": Cc, "D10": D10, "D30": D30, "D60": D60,
+           "organico": organico and not coarse, "turfa": turfa}
 
 st.divider()
 if st.button("Classificar (formulário acima)", type="primary"):
-    data = {"projeto": projeto, "tecnico": tecnico, "amostra": amostra,
-            "pct_retido_200": pct_retido_200,
-            "pct_pedregulho_coarse": pct_pedregulho, "pct_areia_coarse": pct_areia,
-            "LL": None if NP else LL, "LP": None if NP else LP, "NP": NP,
-            "Cu": Cu, "Cc": Cc, "D10": D10, "D30": D30, "D60": D60,
-            "organico": organico, "turfa": turfa}
     try:
-        grupo, relatorio = classify_sucs(data)
+        salvar_resultado("sucs", entrada, classify_sucs({**entrada, **meta}))
+    except ValueError as e:
+        salvar_resultado("sucs", entrada, str(e))
+
+ultimo = ultimo_resultado("sucs", entrada)
+if ultimo:
+    saida, desatualizado = ultimo
+    if desatualizado:
+        aviso_desatualizado()
+    if isinstance(saida, str):
+        st.error(saida)
+    else:
+        grupo, relatorio = saida
         st.success(f"**Grupo SUCS:** {grupo}")
         st.text(relatorio)
         st.download_button("Baixar relatório (.txt)", relatorio, file_name=f"sucs_{amostra or 'amostra'}.txt")
-    except ValueError as e:
-        st.error(str(e))
+
+
+def _processar_lote(df):
+    res = classify_dataframe(df)
+    if "grupo_esperado" in res.columns:
+        res.insert(1, "confere", res["grupo_esperado"].astype(str) == res["grupo"].astype(str))
+    return res
+
 
 st.divider()
 st.subheader("Classificação em lote (CSV / Excel)")
 st.caption("Colunas: " + ", ".join(TEMPLATE_COLS[2:]) + ". Use a planilha-modelo acima como base.")
-uploaded = st.file_uploader("Envie o arquivo", type=["csv", "xlsx"])
-if uploaded is not None:
-    try:
-        if uploaded.name.lower().endswith(".xlsx"):
-            df = pd.read_excel(uploaded)
-        else:
-            head = uploaded.getvalue()[:4096].decode("utf-8-sig", errors="ignore")
-            sep = ";" if head.count(";") > head.count(",") else ","
-            uploaded.seek(0)
-            df = pd.read_csv(uploaded, sep=sep, encoding="utf-8-sig")
-        res = classify_dataframe(df)
-        if "grupo_esperado" in res.columns:
-            res.insert(1, "confere", res["grupo_esperado"].astype(str) == res["grupo"].astype(str))
+uploaded = st.file_uploader("Envie o arquivo", type=["csv", "xlsx"], key="sucs_lote")
+try:
+    r = lote("sucs", uploaded, _processar_lote)
+    if r:
+        res, nome, reaproveitado = r
+        if reaproveitado:
+            st.caption(f"Último lote processado: **{nome}**")
         st.dataframe(res, use_container_width=True)
         st.download_button("Baixar resultados (CSV)", res.to_csv(index=False).encode("utf-8"),
                            file_name="resultados_sucs.csv", mime="text/csv")
-    except Exception as e:
-        st.error(str(e))
+except Exception as e:
+    st.error(str(e))
