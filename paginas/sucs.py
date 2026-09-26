@@ -57,28 +57,41 @@ def quadro_granulometria():
     (ou os dados forem inconsistentes)."""
     with st.container(border=True):
         st.markdown("**Granulometria** — % passante")
-        c4, c200 = st.columns(2)
-        p4 = c4.number_input("Peneira nº 4 (4,75 mm)", 0.0, 100.0, step=0.1, placeholder="—",
-                             **keep("sucs_p4", None))
+        # Ordem da Tabela 5: a nº 200 decide grossa × fina; a nº 4 só entra nos solos grossos (fração graúda).
+        c200, c4 = st.columns(2)
         p200 = c200.number_input("Peneira nº 200 (0,075 mm)", 0.0, 100.0, step=0.1, placeholder="—",
+                                 help="Mais de 50% retido → graduação grossa; 50% ou mais passando → fina.",
                                  **keep("comum_p200", None))
-        g = {"P4": p4, "P200": p200, "Cu": None, "Cc": None, "D10": None, "D30": None, "D60": None}
+        grossa = None if p200 is None else (100.0 - p200) > 50.0
+        p4 = c4.number_input("Peneira nº 4 (4,75 mm)", 0.0, 100.0, step=0.1, placeholder="—",
+                             disabled=grossa is not True,
+                             help="Só para solos grossos: separa pedregulho (retido na nº 4) de areia na fração "
+                                  "graúda.", **keep("sucs_p4", None))
+        g = {"P4": p4 if grossa else None, "P200": p200, "Cu": None, "Cc": None, "D10": None, "D30": None,
+             "D60": None}
         if p200 is None:
-            st.caption("Informe a % passante na #200 para começar.")
-            return g, None
-        if p4 is not None and p200 > p4:
-            st.warning("A % passante na #200 não pode ser maior que na #4.")
+            st.caption("Informe a % passante na nº 200: ela define se o solo é de graduação grossa ou fina.")
             return g, None
         finos, retido = p200, 100.0 - p200
-        grossa = retido > 50.0
         txt = f"Finos **{fmt(finos)}%** · retido na #200 {fmt(retido)}% → **{'grossa' if grossa else 'fina'}**"
-        if grossa and p4 is None:
-            txt += "  \nInforme a #4 para separar pedregulho de areia."
-        elif grossa:
-            ped = 100.0 * (100.0 - p4) / retido
-            txt += (f"  \nFração graúda: pedregulho {fmt(ped)}% · areia {fmt(100 - ped)}% → "
-                    f"**{'pedregulho (G)' if ped >= 50 else 'areia (S)'}**")
+        if not grossa:
+            st.caption(txt + "  \nSolo de graduação fina: a classificação usa LL e LP; a peneira nº 4 não entra "
+                             "(Tabela 5 do Manual IPR-719).")
+            return g, grossa
+        if p4 is None:
+            st.caption(txt + "  \nInforme a % passante na nº 4 para separar pedregulho de areia.")
+            return g, None
+        if p4 < p200:
+            st.error("A % passante na nº 4 não pode ser menor que na nº 200: todo o material que passa na nº 200 "
+                     "também passa na nº 4.")
+            return g, None
+        ped = 100.0 * (100.0 - p4) / retido
+        txt += (f"  \nFração graúda: pedregulho {fmt(ped)}% · areia {fmt(100 - ped)}% → "
+                f"**{'pedregulho (G)' if ped >= 50 else 'areia (S)'}**")
         st.caption(txt)
+        if abs(p4 - p200) < 1e-9:
+            st.info("Passante na nº 4 igual ao da nº 200: a fração areia é nula (granulometria descontínua). "
+                    "É possível, mas confira o ensaio.")
 
         if grossa and finos <= 12.0:
             st.markdown("**Graduação** (decide W/P)")
@@ -182,7 +195,7 @@ def modo_amostra(meta):
     entrada = {**g, **p}
 
     if st.button("Classificar", type="primary", disabled=grossa is None,
-                 help="Informe ao menos a % passante na #200." if grossa is None else None):
+                 help="Complete a granulometria (nº 200 e, para solo grosso, nº 4)." if grossa is None else None):
         try:
             salvar_resultado("sucs", entrada, classify_sucs_result(entrada))
         except ValueError as e:

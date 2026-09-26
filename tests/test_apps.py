@@ -31,7 +31,8 @@ def test_sucs_fino_zona_hachurada():
 
 def test_sucs_grosso_por_passante():
     at = _app("paginas/sucs.py")
-    for k, v in [("sucs_p4", 75.0), ("comum_p200", 8.0), ("comum_ll", 30.0), ("comum_lp", 15.0)]:
+    at.number_input(key="comum_p200").set_value(8.0).run()          # nº 200 primeiro (Tabela 5)
+    for k, v in [("sucs_p4", 75.0), ("comum_ll", 30.0), ("comum_lp", 15.0)]:
         at.number_input(key=k).set_value(v)
     at.run()
     at.number_input(key="sucs_d10").set_value(0.1)
@@ -117,8 +118,8 @@ def _ir(at, pagina):
 
 def test_campos_preservados_ao_navegar_entre_as_tres_paginas():
     at = _app("sucs_app.py")
+    at.number_input(key="comum_p200").set_value(20.0).run()
     at.number_input(key="sucs_p4").set_value(60.0)
-    at.number_input(key="comum_p200").set_value(20.0)
     at.number_input(key="comum_ll").set_value(40.0)
     at.number_input(key="comum_lp").set_value(20.0).run()
     _ir(at, "paginas/trb.py")
@@ -151,8 +152,8 @@ def test_granulometria_e_limites_compartilhados_sucs_trb():
 
 def test_campo_condicional_volta_com_o_valor():
     at = _app("sucs_app.py")
-    at.number_input(key="sucs_p4").set_value(75.0)
     at.number_input(key="comum_p200").set_value(8.0).run()       # grosso, finos 8% → graduação visível
+    at.number_input(key="sucs_p4").set_value(75.0).run()
     at.number_input(key="sucs_d10").set_value(0.2).run()
     at.number_input(key="comum_p200").set_value(30.0).run()      # finos > 12%: graduação some
     at.number_input(key="comum_p200").set_value(8.0).run()       # volta
@@ -188,7 +189,8 @@ def test_sucs_estado_inicial_sem_conclusoes():
     botao = next(b for b in at.button if b.label == "Classificar")
     assert botao.disabled
     textos = " ".join(c.value for c in at.caption)
-    assert "grossa" not in textos and "linha A" not in textos
+    assert "→ **grossa" not in textos and "→ **fina" not in textos and "linha A" not in textos
+    assert at.number_input(key="sucs_p4").disabled                     # nº 4 só após a nº 200
 
 
 def test_mct_laboratorio_exemplo_barbosa():
@@ -277,3 +279,25 @@ def test_fluxograma_destaca_mini_mcv_e_nao_mini_proctor():
     assert "Compactação Mini-MCV\nDNIT 258/2023-ME → c′ e d′" in textos
     assert "Compactação Mini-Proctor\nDNIT 228/2023-ME" in textos
     assert len(destacados) >= 5    # grupo, Mini-MCV, imersão, coeficientes, classificação (+ legenda)
+
+
+def test_sucs_solo_fino_nao_usa_peneira_4():
+    at = _app("paginas/sucs.py")
+    at.number_input(key="comum_p200").set_value(55.0).run()
+    assert at.number_input(key="sucs_p4").disabled                     # fino: nº 4 desabilitada
+    assert any("não entra" in c.value for c in at.caption)
+    at.number_input(key="comum_ll").set_value(35.0)
+    at.number_input(key="comum_lp").set_value(20.0).run()
+    _click(at, "Classificar")
+    assert _grupo_na_tela(at, "CL")
+
+
+def test_sucs_grosso_exige_peneira_4_coerente():
+    at = _app("paginas/sucs.py")
+    at.number_input(key="comum_p200").set_value(30.0).run()
+    assert not at.number_input(key="sucs_p4").disabled
+    assert next(b for b in at.button if b.label == "Classificar").disabled   # falta a nº 4
+    at.number_input(key="sucs_p4").set_value(20.0).run()                  # nº 4 < nº 200
+    assert at.error and next(b for b in at.button if b.label == "Classificar").disabled
+    at.number_input(key="sucs_p4").set_value(30.0).run()                  # igual: areia nula → aviso
+    assert any("areia é nula" in i.value for i in at.info)
