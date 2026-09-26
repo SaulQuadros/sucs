@@ -247,3 +247,33 @@ def test_mct_ex_numerico_abre_laboratorio():
     _click(at, "Abrir no modo Laboratório")
     assert at.segmented_control(key="mct_modo").value == "Laboratório"
     assert at.radio(key="mct_lab_serie").value == "Parsons"
+
+
+def test_mct_sobre_percorre_os_itens():
+    from didatica.sobre_mct import ETAPAS_SOBRE
+    from didatica.glossario_mct import GLOSSARIO
+    assert all(k in GLOSSARIO for _, _, chaves, *_ in ETAPAS_SOBRE for k in chaves)
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/mct.py")
+    at.segmented_control(key="mct_modo").set_value("Sobre o MCT").run()
+    assert not at.exception
+    for k in range(len(ETAPAS_SOBRE)):
+        assert at.selectbox(key="mct_sobre_etapa").value == k
+        assert not at.exception
+        if k < len(ETAPAS_SOBRE) - 1:
+            _click(at, "Próxima")
+    assert any("DNIT 258/2023-ME" in m.value for m in at.markdown)
+
+
+def test_fluxograma_destaca_mini_mcv_e_nao_mini_proctor():
+    import matplotlib
+    matplotlib.use("Agg")
+    from didatica.sobre_mct import plot_fluxograma, AZUL_CLARO
+    fig = plot_fluxograma()
+    textos = {t.get_text(): t for t in fig.axes[0].texts}
+    destacados = [p for p in fig.axes[0].patches
+                  if tuple(round(c, 3) for c in p.get_facecolor()[:3]) ==
+                  tuple(round(int(AZUL_CLARO[i:i + 2], 16) / 255, 3) for i in (1, 3, 5))]
+    assert "Compactação Mini-MCV\nDNIT 258/2023-ME → c′ e d′" in textos
+    assert "Compactação Mini-Proctor\nDNIT 228/2023-ME" in textos
+    assert len(destacados) >= 5    # grupo, Mini-MCV, imersão, coeficientes, classificação (+ legenda)

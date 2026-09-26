@@ -176,6 +176,42 @@ GLOSSARIO = {
         no_ensaio="—",
         nas_equacoes="O Anexo B traz as propriedades típicas de cada grupo; o Anexo C, descrições e correlações "
                      "pedológicas."),
+    "lateritico": dict(
+        termo="Solo laterítico", simbolo="L", unidade="—", norma="DNIT 259/2023-CLA, Anexo C; aula 03",
+        o_que_e="Solo superficial (horizontes A e B) de perfis bem drenados, formado sob clima tropical úmido. A "
+                "laterização enriquece o solo em óxidos e hidróxidos de ferro e/ou alumínio e mantém a caulinita "
+                "como argilomineral predominante, o que dá agregações estáveis e cores avermelhadas ou amareladas.",
+        no_ensaio="Compactado, perde pouca massa quando imerso (Pi baixo) e tem ramo seco íngreme (d′ alto): e′ baixo.",
+        nas_equacoes="Na classificação MCT, corresponde aos grupos LA, LA′ e LG′ (abaixo da fronteira L|N do ábaco)."),
+    "saprolitico": dict(
+        termo="Solo saprolítico (não laterítico)", simbolo="N", unidade="—", norma="DNIT 259/2023-CLA, Anexo C; aula 03",
+        o_que_e="Solo jovem, resultante da decomposição da rocha no local (“rocha apodrecida”), que guarda minerais "
+                "e estrutura da rocha de origem, como micas e argilominerais que podem ser expansivos. É heterogêneo.",
+        no_ensaio="Compactado, tende a ser sensível à água: maior perda de massa por imersão e perda de suporte.",
+        nas_equacoes="Na classificação MCT, corresponde aos grupos NA, NA′, NS′ e NG′."),
+    "mini_proctor": dict(
+        termo="Compactação em equipamento miniatura (Mini-Proctor)", simbolo="", unidade="—",
+        norma="DNIT 228/2023-ME",
+        o_que_e="Curva de compactação (umidade × massa específica aparente seca) de solos finos tropicais no "
+                "equipamento miniatura, nas energias normal, intermediária ou especificada em projeto.",
+        no_ensaio="Base dos corpos de prova do Mini-CBR e dos ensaios associados. Não fornece os coeficientes da "
+                  "classificação MCT.",
+        nas_equacoes="—"),
+    "mini_cbr": dict(
+        termo="Mini-CBR e expansão", simbolo="", unidade="%", norma="DNIT 254/2023-ME",
+        o_que_e="Avaliação expedita da capacidade de suporte e da expansão de solos tropicais compactados no "
+                "equipamento miniatura.",
+        no_ensaio="Feito em corpos de prova do Mini-Proctor. Na DNIT 445/2023-ES, materiais lateríticos para "
+                  "revestimento primário devem ter Mini-CBR ≥ 12% e expansão < 0,5%.",
+        nas_equacoes="Não entra na classificação; o Anexo B da DNIT 259/2023-CLA dá o Mini-CBR típico de cada grupo."),
+    "g_mct": dict(
+        termo="Classificação G-MCT (solos tropicais grossos)", simbolo="G-MCT", unidade="—",
+        norma="DNIT 444/2023-CLA",
+        o_que_e="Extensão da MCT para solos com mais de 10% retido na peneira nº 10: combina o tipo granulométrico "
+                "(Ps, Sp, Gf, pelas porcentagens que passam nas peneiras nº 10 e nº 200) com a classificação MCT "
+                "da fração que passa na nº 10.",
+        no_ensaio="Granulometria do solo total mais ensaios Mini-MCV e perda por imersão da fração fina.",
+        nas_equacoes="Resultado do tipo Ps-LA, Sp-LA′, Gf-LG′ etc."),
 }
 
 

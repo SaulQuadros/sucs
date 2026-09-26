@@ -70,6 +70,22 @@ def etapa_dados():
     st.markdown("Cinco corpos de prova, compactados com umidades diferentes na **série de Parsons** "
                 "(1 a 256 golpes). Em cada golpe da série lê-se a **altura do CP**. Cada CP tem 200 g de solo "
                 "úmido; a massa seca sai da umidade de compactação.")
+    with st.container(border=True):
+        st.markdown("**Como as umidades são definidas** (DNIT 258/2023-ME, seção 6, alíneas f a j)")
+        st.markdown(
+            "- A amostra que passa na peneira nº 10 é dividida em **cinco porções** de cerca de 500 g.\n"
+            "- Uma delas recebe água até uma umidade **próxima da ótima presumível** (porção nº 3).\n"
+            "- Das outras, **duas ficam mais secas e duas mais úmidas**, com umidades sucessivamente crescentes e "
+            "diferença entre pontos consecutivos de cerca de **1% a 2% (solos arenosos)** ou **2% a 3% (solos "
+            "argilosos e siltosos)**.\n"
+            "- As porções repousam em câmara úmida por pelo menos 12 h e são compactadas em **ordem decrescente "
+            "de umidade**; a umidade real de cada CP é determinada em cápsula.")
+        st.dataframe(pd.DataFrame({"CP": [c.nome for c in cps], "Umidade h_c (%)": [c.hc for c in cps],
+                                   "Diferença para o anterior (pontos %)": ["—"] + [
+                                       fmt(b.hc - a.hc) for a, b in zip(cps, cps[1:])]}).set_index("CP").T,
+                     use_container_width=True)
+        st.caption("No exemplo, os passos ficam em torno de 2%, com a porção central em 27,1%. Os números 6, 8, 19, "
+                   "20 e 22 são a identificação dos CPs no laboratório, não uma sequência.")
     _latex(r"M_s = \frac{m_u}{1 + h_c/100}")
     c6 = _cp(cps, "CP6")
     _latex(rf"M_{{s,\,CP6}} = \frac{{200}}{{1 + {fmt(c6.hc)}/100}} = {fmt(c6.ms)}\ \text{{g}}")
@@ -96,9 +112,23 @@ def etapa_afundamento():
     tab = pd.DataFrame({c.nome: [dict(R.curvas[c.nome]).get(n) for n in ns] for c in cps}, index=ns)
     tab.index.name = "n (golpes)"
     st.markdown("**Afundamentos $a_n$ (mm)**")
-    st.dataframe(tab.round(2), use_container_width=True, height=300)
-    st.caption("Só há afundamento nos golpes n que têm leitura em 4n (ex.: não há a_n para n = 96, pois a série "
-               "termina em 256).")
+    st.dataframe(tab.round(2).astype(object).where(tab.notna(), "—"), use_container_width=True, height=300)
+    with st.container(border=True):
+        st.markdown("**Por que os CPs têm quantidades diferentes de afundamentos**")
+        st.markdown("A compactação de cada CP termina quando ocorre o primeiro destes casos (DNIT 258/2023-ME, "
+                    "procedimento, alínea h): **(i)** na série de Parsons, a diferença entre as leituras dos golpes "
+                    "**4n e n é inferior a 2 mm**; **(ii)** na série Simplificada, a diferença entre dois pontos "
+                    "consecutivos é inferior a 0,1 mm; **(iii)** há intensa exsudação de água no topo e na base; "
+                    "**(iv)** o número de golpes atinge **256** (Parsons) ou 250 (Simplificada).")
+        ult = {c.nome: max(c.alturas) for c in cps}
+        c22, c6 = _cp(cps, "CP22"), _cp(cps, "CP6")
+        st.markdown(f"- **CP 22** ({fmt(c22.hc)}%, o mais úmido): no golpe {ult['CP22']} = 4 × 6, "
+                    f"$a_6$ = {fmt(c22.alturas[6], 2)} − {fmt(c22.alturas[24], 2)} = "
+                    f"{fmt(c22.alturas[6] - c22.alturas[24], 2)} mm < 2 mm → critério (i).\n"
+                    f"- **CP 6** ({fmt(c6.hc)}%, o mais seco): chegou a {ult['CP6']} golpes → critério (iv).")
+        st.markdown("Como $a_n = A_n - A_{4n}$, só há afundamento para os $n$ cujo quádruplo foi lido: o CP 22 "
+                    "(até 24 golpes) tem $a_n$ para n ≤ 6 (5 valores); o CP 6 (até 256), para n ≤ 64 (12 valores). "
+                    "Os pontos ausentes ficariam abaixo de 2 mm e não alteram o Mini-MCV nem o c′.")
 
 
 def etapa_deformabilidade():
