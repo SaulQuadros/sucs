@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 import math
 
+from atterberg import avaliar
 from formato import fmt
 
 from trb_defs import (get_definicao, get_subleito_text, ig_tipico_max, get_materiais,
@@ -30,6 +31,22 @@ GROUP_DESC = {
 # adota-se a fronteira no limite máximo: LL > 40 → "41 mín."; IP > 10 → "11 mín."; #40 > 50 → "51 mín.".
 LL_LIM = 40.0
 IP_LIM = 10.0
+
+
+def grupos_possiveis(p10: float, p40: float, p200: float, np_: bool = False) -> list:
+    """Grupos do quadro TRB compatíveis só com a granulometria (e, se NP, com IP = 0)."""
+    if p200 <= 35.0:
+        g = []
+        if p10 <= 50.0 and p40 <= 30.0 and p200 <= 15.0:
+            g.append("A-1-a")
+        if p40 <= 50.0 and p200 <= 25.0:
+            g.append("A-1-b")
+        if p40 > 50.0 and p200 <= 10.0:
+            g.append("A-3" if np_ else "A-3 (se NP)")
+        g += ["A-2-4", "A-2-5"] + ([] if np_ else ["A-2-6", "A-2-7"])
+    else:
+        g = ["A-4", "A-5"] + ([] if np_ else ["A-6", "A-7-5", "A-7-6"])
+    return g
 
 
 def ig_label(ig: int) -> str:
@@ -138,10 +155,12 @@ def classify_trb(p10: float, p40: float, p200: float, ll: float, lp: float, is_n
     lp = 0.0 if lp is None or (isinstance(lp, float) and math.isnan(lp)) else float(lp)
     if not (0.0 <= p200 <= p40 <= p10 <= 100.0):
         raise ValueError("As peneiras devem obedecer: #200 ≤ #40 ≤ #10 ≤ 100, e todos em 0–100%.")
-    if not is_np and lp > ll:
-        raise ValueError("LP maior que LL: verifique os ensaios (ou marque NP).")
-    ip = 0.0 if is_np else ll - lp
-    np_ = is_np or ip == 0.0
+    lim = avaliar(ll, lp, is_np)          # regras da DNER-ME 082/94 (NP, LP ≥ LL, valores nulos)
+    if lim.erro:
+        raise ValueError(lim.erro)
+    ip, np_ = lim.ip, lim.np_
+    if lim.nota:
+        R.append(lim.nota)
 
     granular = p200 <= 35.0
     R.append(f"% passante na #200 = {fmt(p200)}% → {'material granular (≤ 35%)' if granular else 'material silto-argiloso (> 35%)'}")

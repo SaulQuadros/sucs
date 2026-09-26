@@ -22,7 +22,7 @@ def _click(at, label):
 
 def test_sucs_fino_zona_hachurada():
     at = _app("paginas/sucs.py")
-    at.number_input(key="comum_p200").set_value(70.0)
+    at.number_input(key="comum_p200").set_value(70.0).run()
     at.number_input(key="comum_ll").set_value(25.0)
     at.number_input(key="comum_lp").set_value(19.0).run()
     _click(at, "Classificar")
@@ -33,8 +33,7 @@ def test_sucs_grosso_por_passante():
     at = _app("paginas/sucs.py")
     at.number_input(key="comum_p200").set_value(8.0).run()          # nº 200 primeiro (Tabela 5)
     for k, v in [("sucs_p4", 75.0), ("comum_ll", 30.0), ("comum_lp", 15.0)]:
-        at.number_input(key=k).set_value(v)
-    at.run()
+        at.number_input(key=k).set_value(v).run()
     at.number_input(key="sucs_d10").set_value(0.1)
     at.number_input(key="sucs_d30").set_value(0.3)
     at.number_input(key="sucs_d60").set_value(0.9).run()
@@ -55,8 +54,7 @@ def _grupo_na_tela(at, grupo):
 def test_trb_ip_decimal():
     at = _app("paginas/trb.py")
     for k, v in [("trb_p10", 80.0), ("trb_p40", 60.0), ("comum_p200", 30.0), ("comum_ll", 30.0), ("comum_lp", 19.5)]:
-        at.number_input(key=k).set_value(v)
-    at.run()
+        at.number_input(key=k).set_value(v).run()
     _click(at, "Classificar")
     assert _grupo_na_tela(at, "A-2-6")
 
@@ -70,8 +68,7 @@ def test_trb_estado_inicial_e_lote():
 
 def _preencher_mct(at):
     for k, v in [("mct_c", 1.2), ("mct_d", 50.0), ("mct_af10", 47.0), ("mct_pi10", 80.0), ("mct_pi15", 20.0)]:
-        at.number_input(key=k).set_value(v)
-    at.run()
+        at.number_input(key=k).set_value(v).run()
 
 
 def test_mct_individual():
@@ -119,11 +116,12 @@ def _ir(at, pagina):
 def test_campos_preservados_ao_navegar_entre_as_tres_paginas():
     at = _app("sucs_app.py")
     at.number_input(key="comum_p200").set_value(20.0).run()
-    at.number_input(key="sucs_p4").set_value(60.0)
+    at.number_input(key="sucs_p4").set_value(60.0).run()
     at.number_input(key="comum_ll").set_value(40.0)
     at.number_input(key="comum_lp").set_value(20.0).run()
     _ir(at, "paginas/trb.py")
-    at.number_input(key="trb_p40").set_value(35.0)
+    at.number_input(key="trb_p10").set_value(60.0).run()
+    at.number_input(key="trb_p40").set_value(35.0).run()
     at.checkbox(key="comum_np").check().run()
     _ir(at, "paginas/mct.py")
     at.radio(key="mct_modo_e").set_value("Informar e' diretamente").run()
@@ -142,7 +140,8 @@ def test_campos_preservados_ao_navegar_entre_as_tres_paginas():
 
 def test_granulometria_e_limites_compartilhados_sucs_trb():
     at = _app("sucs_app.py")
-    at.number_input(key="comum_p200").set_value(45.0)
+    at.number_input(key="comum_p200").set_value(45.0).run()        # grosso no SUCS: pede a nº 4
+    at.number_input(key="sucs_p4").set_value(90.0).run()
     at.number_input(key="comum_ll").set_value(38.0)
     at.number_input(key="comum_lp").set_value(22.0).run()
     _ir(at, "paginas/trb.py")
@@ -164,8 +163,7 @@ def test_resultado_preservado_e_marcado_quando_desatualizado():
     at = _app("sucs_app.py")
     _ir(at, "paginas/trb.py")
     for k, v in [("trb_p10", 80.0), ("trb_p40", 60.0), ("comum_p200", 30.0), ("comum_ll", 30.0), ("comum_lp", 19.5)]:
-        at.number_input(key=k).set_value(v)
-    at.run()
+        at.number_input(key=k).set_value(v).run()
     _click(at, "Classificar")
     _ir(at, "paginas/mct.py")
     _ir(at, "paginas/trb.py")
@@ -301,3 +299,28 @@ def test_sucs_grosso_exige_peneira_4_coerente():
     assert at.error and next(b for b in at.button if b.label == "Classificar").disabled
     at.number_input(key="sucs_p4").set_value(30.0).run()                  # igual: areia nula → aviso
     assert any("areia é nula" in i.value for i in at.info)
+
+
+def test_trb_limites_so_depois_das_peneiras():
+    at = _app("paginas/trb.py")
+    assert at.number_input(key="comum_ll").disabled and at.checkbox(key="comum_np").disabled
+    for k, v in [("trb_p10", 60.0), ("trb_p40", 70.0), ("comum_p200", 30.0)]:   # nº 40 > nº 10: incoerente
+        at.number_input(key=k).set_value(v).run()
+    assert at.error and at.number_input(key="comum_ll").disabled
+    at.number_input(key="trb_p40").set_value(50.0).run()                         # coerente
+    assert not at.number_input(key="comum_ll").disabled and not at.checkbox(key="comum_np").disabled
+    assert any("Pela granulometria" in c.value for c in at.caption)
+
+
+def test_trb_lp_zero_e_lp_maior_que_ll():
+    at = _app("paginas/trb.py")
+    for k, v in [("trb_p10", 85.0), ("trb_p40", 60.0), ("comum_p200", 30.0)]:
+        at.number_input(key=k).set_value(v).run()
+    at.number_input(key="comum_ll").set_value(30.0)
+    at.number_input(key="comum_lp").set_value(0.0).run()
+    assert any("LP = 0" in e.value for e in at.error)
+    assert next(b for b in at.button if b.label == "Classificar").disabled
+    at.number_input(key="comum_lp").set_value(35.0).run()                        # LP ≥ LL → NP
+    assert any("DNER-ME 082/94" in i.value for i in at.info)
+    _click(at, "Classificar")
+    assert _grupo_na_tela(at, "A-2-4")

@@ -10,7 +10,9 @@ from didatica.generator_pdf import generate_random_sucs_pdf
 from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
 from formato import fmt
 from projeto import get_meta
-from trb_core import EXEMPLOS, classify_dataframe_trb, classify_trb, ig_conta, ig_label, plot_trb
+from atterberg import avaliar
+from trb_core import (EXEMPLOS, classify_dataframe_trb, classify_trb, grupos_possiveis, ig_conta, ig_label,
+                      plot_trb)
 from trb_defs import cbr_for_trb, get_definicao, get_materiais, sucs_provavel
 from xlsx_utils import resolve_xlsx_engine, to_xlsx_bytes
 
@@ -77,6 +79,7 @@ def cabecalho():
 
 
 def quadro_granulometria():
+    """Retorna ((p10, p40, p200), granular): granular = True/False, ou None se incompleta ou incoerente."""
     with st.container(border=True):
         st.markdown("**Granulometria** — % passante")
         c10, c40, c200 = st.columns(3)
@@ -85,35 +88,52 @@ def quadro_granulometria():
         p200 = c200.number_input("Peneira nº 200", 0.0, 100.0, step=0.1, placeholder="—",
                                  **keep("comum_p200", None))
         if None in (p10, p40, p200):
-            st.caption("Informe a % passante nas peneiras nº 10, 40 e 200.")
+            st.caption("Informe a % passante nas peneiras nº 10, 40 e 200. Os limites de Atterberg são liberados "
+                       "depois da granulometria.")
             return (p10, p40, p200), None
         if not (p200 <= p40 <= p10):
-            st.warning("As peneiras devem obedecer: #200 ≤ #40 ≤ #10.")
+            st.error("Peneiras incoerentes: a % passante não pode aumentar em peneira mais fina "
+                     "(deve valer nº 200 ≤ nº 40 ≤ nº 10).")
             return (p10, p40, p200), None
         granular = p200 <= 35.0
-        st.caption(f"#200 = **{fmt(p200)}%** → **{'granular (≤ 35%)' if granular else 'silto-argiloso (> 35%)'}**")
+        st.caption(f"#200 = **{fmt(p200)}%** → **{'granular (≤ 35%)' if granular else 'silto-argiloso (> 35%)'}**"
+                   f"  \nPela granulometria: {', '.join(grupos_possiveis(p10, p40, p200))}")
         return (p10, p40, p200), granular
 
 
-def quadro_plasticidade():
+def quadro_plasticidade(granulometria, granular):
+    """Limites só depois de uma granulometria válida. Retorna (entradas, pronto)."""
+    liberado = granular is not None
     with st.container(border=True):
         st.markdown("**Plasticidade** — limites de Atterberg")
         cll, clp, cnp = st.columns([1, 1, 0.8], vertical_alignment="bottom")
-        np_ = cnp.checkbox("NP", help="Não plástico. No TRB o LL, se houver, ainda entra no IG.",
-                           **keep("comum_np", False))
-        ll = cll.number_input("LL (%)", 0.0, 300.0, step=0.1, placeholder="—", **keep("comum_ll", None))
-        lp = clp.number_input("LP (%)", 0.0, 300.0, step=0.1, disabled=np_, placeholder="—",
+        np_ = cnp.checkbox("NP", disabled=not liberado,
+                           help="Não plástico (DNER-ME 082/94): LL ou LP não determinável, ou LP ≥ LL. Vale para "
+                                "qualquer granulometria e restringe o grupo a IP = 0 (A-1, A-3, A-2-4/5, A-4/5). "
+                                "No TRB, o LL, se houver, ainda entra no IG.", **keep("comum_np", False))
+        ll = cll.number_input("LL (%)", 0.0, 300.0, step=0.1, placeholder="—", disabled=not liberado,
+                              **keep("comum_ll", None))
+        lp = clp.number_input("LP (%)", 0.0, 300.0, step=0.1, placeholder="—", disabled=not liberado or np_,
                               **keep("comum_lp", None))
-        if np_:
-            st.caption("IP = **NP**" + (f" · LL = {fmt(ll)} ({'≤ 40' if ll <= 40 else '≥ 41'})" if ll is not None else ""))
-            return {"ll": ll or 0.0, "lp": 0.0, "np": True}, True
-        if ll is None or lp is None:
+        if not liberado:
+            st.caption("Liberado depois de uma granulometria completa e coerente.")
+            return {"ll": ll, "lp": lp, "np": np_}, False
+        lim = avaliar(ll, lp, np_)
+        if lim.erro:
+            st.error(lim.erro)
+            return {"ll": ll, "lp": lp, "np": np_}, False
+        if not lim.completo:
             st.caption("Informe LL e LP, ou marque NP.")
-            return {"ll": ll, "lp": lp, "np": False}, False
-        if lp > ll:
-            st.warning("LP maior que LL: verifique os ensaios (ou marque NP).")
-            return {"ll": ll, "lp": lp, "np": False}, False
-        ip = ll - lp
+            return {"ll": ll, "lp": lp, "np": np_}, False
+        p10, p40, p200 = granulometria
+        if lim.np_:
+            txt = "IP = **NP**" + (f" · LL = {fmt(ll)} ({'≤ 40' if ll <= 40 else '≥ 41'})" if ll else
+                                   " · sem LL: adota-se LL ≤ 40")
+            if lim.nota:
+                st.info(lim.nota)
+            st.caption(txt + f"  \nCom NP: {', '.join(grupos_possiveis(p10, p40, p200, np_=True))}")
+            return {"ll": ll or 0.0, "lp": 0.0, "np": True}, True
+        ip = lim.ip
         st.caption(f"IP = **{fmt(ip)}** ({'≤ 10' if ip <= 10 else '≥ 11'}) · LL {'≤ 40' if ll <= 40 else '≥ 41'}"
                    + (f" · LL − 30 = {fmt(ll - 30)}" if ll > 40 and ip > 10 else ""))
         return {"ll": ll, "lp": lp, "np": False}, True
@@ -157,7 +177,7 @@ def modo_amostra(meta):
     with c_g:
         (p10, p40, p200), granular = quadro_granulometria()
     with c_p:
-        plast, plast_ok = quadro_plasticidade()
+        plast, plast_ok = quadro_plasticidade((p10, p40, p200), granular)
     entrada = {"p10": p10, "p40": p40, "p200": p200, **plast}
     pronto = granular is not None and plast_ok
     if st.button("Classificar", type="primary", disabled=not pronto,

@@ -60,9 +60,33 @@ def test_peneiras_invalidas():
         classify_trb(40, 60, 10, 30, 20)
 
 
-def test_lp_maior_que_ll():
-    with pytest.raises(ValueError):
-        classify_trb(80, 60, 50, 30, 35)
+def test_lp_maior_ou_igual_ll_e_np():
+    # DNER-ME 082/94, item 4: LP ≥ LL → IP anotado como NP
+    r = classify_trb(80, 60, 50, 30, 35)
+    assert r.group == "A-4" and any("NP" in x for x in r.rationale)
+    assert classify_trb(95, 80, 8, 20, 20).group == "A-3"        # LL = LP → NP → A-3
+
+
+def test_limites_que_nao_sao_resultado_de_ensaio():
+    with pytest.raises(ValueError, match="LP = 0"):
+        classify_trb(80, 60, 30, 30, 0)                           # antes: A-2-6 com IP 30
+    with pytest.raises(ValueError, match="marque NP"):
+        classify_trb(80, 60, 30, 0, 0)                            # antes: tratado em silêncio como NP
+
+
+def test_np_vale_para_todos_os_grupos_de_ip_baixo():
+    assert classify_trb(40, 20, 10, 0, 0, is_np=True).group == "A-1-a"
+    assert classify_trb(85, 60, 30, 0, 0, is_np=True).group == "A-2-4"
+    assert classify_trb(85, 60, 30, 45, 0, is_np=True).group == "A-2-5"
+    assert classify_trb(90, 80, 60, 0, 0, is_np=True).group == "A-4"   # silte não plástico
+
+
+def test_grupos_possiveis_pela_granulometria():
+    from trb_core import grupos_possiveis
+    assert grupos_possiveis(45, 25, 10) == ["A-1-a", "A-1-b", "A-2-4", "A-2-5", "A-2-6", "A-2-7"]
+    assert grupos_possiveis(95, 80, 8) == ["A-3 (se NP)", "A-2-4", "A-2-5", "A-2-6", "A-2-7"]
+    assert grupos_possiveis(95, 80, 8, np_=True) == ["A-3", "A-2-4", "A-2-5"]
+    assert grupos_possiveis(90, 80, 60, np_=True) == ["A-4", "A-5"]
 
 
 def test_planilha_modelo_confere():

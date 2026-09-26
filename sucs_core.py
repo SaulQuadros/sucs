@@ -9,6 +9,7 @@ from typing import List, Optional
 import math
 import re
 
+from atterberg import avaliar
 from formato import fmt  # noqa: F401 (reexportado para as páginas)
 
 LINE_A_SLOPE = 0.73      # linha A: IP = 0,73·(LL − 20)
@@ -241,18 +242,14 @@ def classify_sucs_result(data) -> SUCSResult:
     pct_ret_200, pg, ps, P4, P200 = _retido_e_fracoes(data)
     pct_finos = 100.0 - pct_ret_200
 
-    NP = _bool(data.get("NP", False))
     LL, LP = _num(data.get("LL")), _num(data.get("LP"))
-    IP = None
-    if NP:
-        IP = 0.0
-    elif LL is not None and LP is not None:
-        if LP > LL:
-            raise ValueError("LP maior que LL: verifique os ensaios (ou marque NP).")
-        IP = LL - LP
+    lim = avaliar(LL, LP, _bool(data.get("NP", False)))
+    if lim.erro:
+        raise ValueError(lim.erro)
+    NP, IP = lim.np_, lim.ip
 
     E: List[str] = []
-    passos: List[str] = []
+    passos: List[str] = [lim.nota] if lim.nota else []
     avisos: List[str] = []
 
     Cu, Cc = _num(data.get("Cu")), _num(data.get("Cc"))

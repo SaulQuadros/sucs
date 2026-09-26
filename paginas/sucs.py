@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 
 from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
+from atterberg import avaliar
 from projeto import get_meta
 from sucs_core import (EXEMPLOS, classify_dataframe, classify_sucs_result, cu_cc, fmt, line_a,
                        plasticity_zone, plot_plasticidade)
@@ -118,23 +119,31 @@ def quadro_granulometria():
 
 
 def quadro_plasticidade(grossa):
+    liberado = grossa is not None
     with st.container(border=True):
         st.markdown("**Plasticidade** — limites de Atterberg")
         cll, clp, cnp = st.columns([1, 1, 0.8], vertical_alignment="bottom")
-        NP = cnp.checkbox("NP", help="Não plástico", **keep("comum_np", False))
-        LL = cll.number_input("LL (%)", 0.0, 300.0, step=0.1, disabled=NP, placeholder="—",
+        NP = cnp.checkbox("NP", disabled=not liberado,
+                          help="Não plástico (DNER-ME 082/94): LL ou LP não determinável, ou LP ≥ LL.",
+                          **keep("comum_np", False))
+        LL = cll.number_input("LL (%)", 0.0, 300.0, step=0.1, disabled=NP or not liberado, placeholder="—",
                               **keep("comum_ll", None))
-        LP = clp.number_input("LP (%)", 0.0, 300.0, step=0.1, disabled=NP, placeholder="—",
+        LP = clp.number_input("LP (%)", 0.0, 300.0, step=0.1, disabled=NP or not liberado, placeholder="—",
                               **keep("comum_lp", None))
-        if NP:
+        lim = avaliar(LL, LP, NP)
+        if not liberado:
+            st.caption("Liberado depois da granulometria.")
+        elif lim.erro:
+            st.error(lim.erro)
+        elif lim.np_:
+            if lim.nota:
+                st.info(lim.nota)
             st.caption("IP = **NP** → finos não plásticos (tratados como siltosos)")
-        elif LL is None or LP is None:
+        elif not lim.completo:
             st.caption("Informe LL e LP, ou marque NP.")
-        elif LP > LL:
-            st.warning("LP maior que LL: verifique os ensaios (ou marque NP).")
         else:
             z = plasticity_zone(LL, LP)
-            st.caption(f"IP = **{fmt(LL - LP)}** · linha A em {fmt(line_a(LL))} → {ZONA_TXT[z]}")
+            st.caption(f"IP = **{fmt(lim.ip)}** · linha A em {fmt(line_a(LL))} → {ZONA_TXT[z]}")
         st.markdown("**Matéria orgânica**")
         co, ct = st.columns(2)
         organico = co.checkbox("Evidência orgânica", disabled=bool(grossa),
@@ -144,7 +153,7 @@ def quadro_plasticidade(grossa):
         turfa = ct.checkbox("Turfa", help="Material altamente orgânico e fibroso → PT.",
                             **keep("sucs_turfa", False))
     return {"LL": None if NP else LL, "LP": None if NP else LP, "NP": NP,
-            "organico": organico and not grossa, "turfa": turfa}
+            "organico": organico and not grossa, "turfa": turfa}, lim.erro is None
 
 
 def mostrar_resultado(r, meta):
@@ -191,10 +200,10 @@ def modo_amostra(meta):
     with c_g:
         g, grossa = quadro_granulometria()
     with c_p:
-        p = quadro_plasticidade(grossa)
+        p, limites_ok = quadro_plasticidade(grossa)
     entrada = {**g, **p}
 
-    if st.button("Classificar", type="primary", disabled=grossa is None,
+    if st.button("Classificar", type="primary", disabled=grossa is None or not limites_ok,
                  help="Complete a granulometria (nº 200 e, para solo grosso, nº 4)." if grossa is None else None):
         try:
             salvar_resultado("sucs", entrada, classify_sucs_result(entrada))

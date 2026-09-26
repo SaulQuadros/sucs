@@ -109,3 +109,11 @@ def test_resultado_estruturado():
     assert any("Cu e Cc" in a for a in r.avisos)
     assert r.passos[0].startswith("92,0% retido")          # vírgula decimal
     assert "SC: 5 a 20" in r.cbr and r.trb[0] == "SW"
+
+
+
+def test_sucs_lp_maior_que_ll_e_np():
+    # DNER-ME 082/94, item 4
+    assert s(P4=100, P200=70, LL=30, LP=35) == "ML"
+    with pytest.raises(ValueError, match="LP = 0"):
+        s(P4=100, P200=70, LL=30, LP=0)
