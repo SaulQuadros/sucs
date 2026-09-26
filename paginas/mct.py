@@ -10,12 +10,16 @@ import pandas as pd
 import streamlit as st
 
 from didatica.mct_examples import build_excel_template_bytes_mct, template_df_mct
-from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
+from estado import (aviso_desatualizado, definir_editor, editor_persistente, keep, lote,
+                    salvar_resultado, ultimo_resultado)
 from formato import fmt
 from mct_core import (GRUPOS, NORMA_CLA, NORMA_ME, PROPRIEDADES, MCTInput, build_report,
                       classify_dataframe_mct, classify_from_inputs, compute_e_prime, pi_referencia,
                       plot_mct_abaco, plot_point_on_abaco)
+from mct_lab import (EXEMPLOS_LAB, SERIES, calcular, de_tabelas, numerico, para_tabelas, plot_af, plot_compactacao,
+                     plot_deformabilidade, plot_pi, tabela_cps)
 from projeto import get_meta
+from xlsx_utils import resolve_xlsx_engine
 
 PROP_LABELS = {"granulometria": "Granulometria típica", "mini_cbr_sem_imersao": "Mini-CBR sem imersão",
                "perda_suporte_imersao": "Perda de suporte por imersão", "expansao": "Expansão",
@@ -190,6 +194,160 @@ def modo_amostra(meta):
             mostrar_resultado(res, meta)
 
 
+def _carregar_exemplo():
+    serie, cps, fonte = EXEMPLOS_LAB[st.session_state["mct_lab_exemplo"]]()
+    alturas, dados = para_tabelas(serie, cps)
+    definir_editor("mct_lab_alturas", alturas)
+    definir_editor("mct_lab_dados", dados)
+    st.session_state["__copia__mct_lab_serie"] = serie
+    st.session_state["__mct_lab_fonte"] = fonte
+    st.session_state.pop("__resultado__mct_lab", None)
+
+
+def _limpar_lab():
+    serie = st.session_state.get("mct_lab_serie", "Parsons")
+    golpes = SERIES[serie]
+    definir_editor("mct_lab_alturas", numerico(pd.DataFrame({"golpes": golpes, **{f"CP{i}": [None] * len(golpes)
+                                                                                    for i in range(1, 6)}})))
+    definir_editor("mct_lab_dados", numerico(pd.DataFrame([{"CP": f"CP{i}", "hc (%)": None, "massa úmida (g)": 200.0,
+                                                            "Md desprendida (g)": None, "Lex (mm)": 10.0, "Fc": 1.0,
+                                                            "Pi direto (%)": None} for i in range(1, 6)])))
+    st.session_state.pop("__mct_lab_fonte", None)
+    st.session_state.pop("__resultado__mct_lab", None)
+
+
+def _modelo_lab_xlsx() -> bytes:
+    import io
+    serie, cps, fonte = EXEMPLOS_LAB[next(iter(EXEMPLOS_LAB))]()
+    alturas, dados = para_tabelas(serie, cps)
+    info = pd.DataFrame({"Instruções": [
+        "Aba 'alturas': uma linha por nº de golpes acumulado e uma coluna por corpo de prova (altura do CP, mm).",
+        "Aba 'cps': uma linha por corpo de prova; o nome em 'CP' deve ser igual ao cabeçalho da coluna em 'alturas'.",
+        "Pi = 100·(Md·Lcp)/(Ms·Lex)·Fc, com Ms pela massa úmida e hc, e Lcp = altura final; ou informe 'Pi direto (%)'.",
+        f"Série: {serie}. Exemplo preenchido: {fonte}."]})
+    mem = io.BytesIO()
+    with pd.ExcelWriter(mem, engine=resolve_xlsx_engine()) as xw:
+        alturas.to_excel(xw, index=False, sheet_name="alturas")
+        dados.to_excel(xw, index=False, sheet_name="cps")
+        info.to_excel(xw, index=False, sheet_name="instrucoes")
+    return mem.getvalue()
+
+
+def modo_laboratorio(meta):
+    st.markdown("Das leituras do ensaio aos coeficientes: informe as **alturas do corpo de prova** em cada nº de "
+                "golpes e os **dados de cada CP**. O app calcula Mini-MCV, c', d', a altura final e o Pi' "
+                "(DNIT 258/2023-ME) e classifica (DNIT 259/2023-CLA).")
+    with st.container(border=True):
+        c1, c2, c3 = st.columns([2.2, 1, 1], vertical_alignment="bottom")
+        c1.selectbox("Exemplo com dados publicados", list(EXEMPLOS_LAB), key="mct_lab_exemplo")
+        c2.button("Carregar exemplo", on_click=_carregar_exemplo, use_container_width=True)
+        c3.button("Limpar tabelas", on_click=_limpar_lab, use_container_width=True)
+        c4, c5, c6 = st.columns([1.2, 1, 1.4], vertical_alignment="bottom")
+        serie = c4.radio("Série de golpes", ["Parsons", "Simplificada"], horizontal=True,
+                         **keep("mct_lab_serie", "Parsons"))
+        try:
+            c5.download_button("Planilha-modelo", data=_modelo_lab_xlsx(), file_name="MCT_laboratorio_modelo.xlsx",
+                               mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                               use_container_width=True)
+        except Exception as ex:
+            c5.caption(f"Excel indisponível: {ex}")
+        arq = c6.file_uploader("Enviar planilha preenchida", type=["xlsx"], key="mct_lab_arquivo",
+                               label_visibility="collapsed")
+        if arq is not None and st.session_state.get("__mct_lab_arq") != (arq.name, arq.size):
+            try:
+                abas = pd.read_excel(arq, sheet_name=None)
+                definir_editor("mct_lab_alturas", numerico(abas["alturas"]))
+                definir_editor("mct_lab_dados", numerico(abas["cps"]))
+                st.session_state["__mct_lab_arq"] = (arq.name, arq.size)
+                st.session_state["__mct_lab_fonte"] = f"planilha {arq.name}"
+                st.rerun()
+            except Exception as ex:
+                st.error(f"Não foi possível ler a planilha (abas 'alturas' e 'cps'): {ex}")
+        if st.session_state.get("__mct_lab_fonte"):
+            st.caption(f"Dados carregados: {st.session_state['__mct_lab_fonte']}")
+
+    if "__editor_salvo__mct_lab_alturas" not in st.session_state:
+        _limpar_lab()
+    ca, cd = st.columns([1.35, 1], gap="medium")
+    with ca:
+        st.markdown("**Alturas do corpo de prova (mm)** por nº de golpes acumulado")
+        alturas = editor_persistente("mct_lab_alturas", pd.DataFrame(), num_rows="dynamic", hide_index=True,
+                                     use_container_width=True, height=420)
+    with cd:
+        st.markdown("**Dados de cada corpo de prova**")
+        dados = editor_persistente("mct_lab_dados", pd.DataFrame(), num_rows="dynamic", hide_index=True,
+                                   use_container_width=True)
+        st.caption("hc: umidade de compactação. Ms = massa úmida/(1 + hc). Pi = 100·(Md·Lcp)/(Ms·Lex)·Fc, "
+                   "com Lcp = altura final; ou preencha 'Pi direto (%)'.")
+
+    cps = de_tabelas(alturas, dados)
+    entrada = {"serie": serie, "alturas": alturas.to_json(), "dados": dados.to_json()}
+    if st.button("Calcular", type="primary", disabled=len(cps) < 2,
+                 help=None if len(cps) >= 2 else "Preencha ao menos dois corpos de prova."):
+        try:
+            salvar_resultado("mct_lab", entrada, calcular(cps, serie))
+            st.session_state["__mct_lab_token"] = st.session_state.get("__mct_lab_token", 0) + 1
+        except Exception as ex:
+            salvar_resultado("mct_lab", entrada, str(ex))
+
+    ultimo = ultimo_resultado("mct_lab", entrada)
+    if not ultimo:
+        return
+    R, desatualizado = ultimo
+    if desatualizado:
+        aviso_desatualizado()
+    if isinstance(R, str):
+        st.error(R)
+        return
+
+    with st.container(border=True):
+        st.markdown("**Resultados do ensaio**")
+        st.dataframe(tabela_cps(R), hide_index=True, use_container_width=True)
+        g1, g2 = st.columns(2)
+        g1.pyplot(plot_deformabilidade(R), use_container_width=True)
+        g2.pyplot(plot_compactacao(R), use_container_width=True)
+        g3, g4 = st.columns(2)
+        g3.pyplot(plot_af(R), use_container_width=True)
+        g4.pyplot(plot_pi(R), use_container_width=True)
+        st.markdown("\n".join(f"{i}. {p}" for i, p in enumerate(R.passos, 1)))
+        for a in R.avisos:
+            st.warning(a)
+        st.caption("O “trecho retilíneo mais inclinado” é escolhido automaticamente (janela de 3 pontos de maior "
+                   "inclinação, destacada em cinza nos gráficos). Ajuste os valores abaixo se a sua leitura for outra.")
+
+    tk = st.session_state.get("__mct_lab_token", 0)
+    with st.container(border=True):
+        st.markdown("**Coeficientes adotados** — valores calculados; altere se necessário")
+        k1, k2, k3 = st.columns(3)
+        c_ = k1.number_input("c'", min_value=0.0, max_value=5.0, step=0.01, format="%.2f", placeholder="—",
+                             **keep(f"mct_lab_c_{tk}", None if R.c_ is None else round(R.c_, 2)))
+        d_ = k2.number_input("d' (kg/m³/%)", min_value=0.1, max_value=2000.0, step=0.5, format="%.1f",
+                             placeholder="—", **keep(f"mct_lab_d_{tk}", None if R.d_ is None else round(R.d_, 1)))
+        pi_ = k3.number_input("Pi' (%)", min_value=0.0, max_value=1000.0, step=0.1, format="%.1f", placeholder="—",
+                              **keep(f"mct_lab_pi_{tk}", None if R.pi_ref is None else round(R.pi_ref, 1)))
+        opc = ["Não verificado", "Sim", "Não"]
+        pad = lambda v: "Não verificado" if v is None else ("Sim" if v else "Não")
+        q1, q2 = st.columns(2)
+        cr1 = q1.radio("Pi × Mini-MCV com inclinação negativa entre 10 e 15?", opc, horizontal=True,
+                       **keep(f"mct_lab_cr1_{tk}", pad(R.crit_pi_negativa)))
+        cr2 = q2.radio("Mini-MCV × umidade com concavidade para cima?", opc, horizontal=True,
+                       **keep(f"mct_lab_cr2_{tk}", pad(R.crit_concavidade)))
+        st.caption("Critérios do item 5.1 c) avaliados a partir dos dados (usados só se o ponto ficar perto da "
+                   "fronteira L|N).")
+    if None in (c_, d_, pi_):
+        st.info("Faltam coeficientes para classificar: complete os dados do ensaio ou informe os valores acima.")
+        return
+    try:
+        res = classify_from_inputs(MCTInput(c_=c_, d_=d_, pi_ref=pi_, meta=meta,
+                                            serie="Parsons" if R.serie == "Parsons" else "simplificada",
+                                            pi_inclinacao_negativa=None if cr1 == opc[0] else cr1 == "Sim",
+                                            mcv_concavidade_para_cima=None if cr2 == opc[0] else cr2 == "Sim"))
+    except Exception as ex:
+        st.error(f"Erro ao classificar: {ex}")
+        return
+    mostrar_resultado(res, meta)
+
+
 def _processar_lote(df):
     out = classify_dataframe_mct(df)
     if "grupo_esperado" in out.columns:
@@ -247,13 +405,13 @@ def modo_quadro():
 
 cabecalho()
 _meta = get_meta()
-_modo = st.segmented_control("Modo", ["Uma amostra", "Lote (CSV/Excel)", "Quadro dos grupos"],
+_modo = st.segmented_control("Modo", ["Uma amostra", "Laboratório", "Lote (CSV/Excel)", "Quadro dos grupos"],
                              label_visibility="collapsed", required=True, **keep("mct_modo", "Uma amostra"))
 if _modo == "Lote (CSV/Excel)":
     modo_lote()
+elif _modo == "Laboratório":
+    modo_laboratorio(_meta)
 elif _modo == "Quadro dos grupos":
     modo_quadro()
 else:
     modo_amostra(_meta)
-st.caption("Próxima etapa: modo laboratório, que calculará c', d' e Pi a partir das leituras do ensaio "
-           "Mini-MCV (DNIT 258/2023-ME).")

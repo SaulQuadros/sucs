@@ -69,7 +69,13 @@ O que o usuário preenche é preservado ao trocar de página (`estado.py`): todo
 - Pi' (item 3.8): AF no Mini-MCV 10 ≥ 48 mm → Pi a Mini-MCV 10; AF < 48 mm → Pi a Mini-MCV 15.
 - e' = ∛(Pi'/100 + 20/d'), com d' da curva de 10 golpes (série simplificada) ou 12 (Parsons).
 - Ábaco da Figura A1 pelos vértices cotados: (0,27; 2,2), (0,45; 1,75), (0,59; 1,4), (0,70; 1,15), (1,7; 1,15) e c' = 1,5.
-- Critério de desempate perto da fronteira L|N (item 5.1 c).
+- Critério de desempate perto da fronteira L|N (item 5.1 c) e aviso de ponto próximo a qualquer fronteira.
+- **Modo laboratório** (`mct_lab.py`): das alturas do CP por nº de golpes (séries de Parsons ou Simplificada)
+  e dos dados de imersão calcula afundamentos, Mini-MCV, c' (curva interpolada com Mini-MCV = 10), MEAS,
+  d' (ramo seco da curva de 12 ou 10 golpes), Pi, altura final e Pi' no Mini-MCV 10/15 e os critérios do
+  item 5.1 c; plota as curvas de deformabilidade, compactação, altura final e Pi × Mini-MCV. O trecho
+  "retilíneo mais inclinado" é automático (janela de 3 pontos) e pode ser ajustado pelo usuário.
+  Validado com a planilha da Figura A8 da DNIT 258/2023 (c' = 1,20) e com Barbosa (2021), TCC UFJF (LG').
 
 ## 📁 Estrutura
 

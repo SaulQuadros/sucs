@@ -83,3 +83,27 @@ def lote(pagina: str, arquivo, processar):
 
 def limpar_lote(pagina: str) -> None:
     st.session_state.pop(f"__lote__{pagina}", None)
+
+
+# ---------------------------------------------------------------------------
+# Tabelas editáveis (st.data_editor) preservadas entre páginas
+# ---------------------------------------------------------------------------
+def editor_persistente(chave: str, df_inicial: pd.DataFrame, **kwargs) -> pd.DataFrame:
+    """st.data_editor cujo conteúdo sobrevive à troca de página. Enquanto o editor existe, os dados de
+    base ficam fixos (o próprio widget guarda as edições); quando ele é recriado (primeira vez ou volta de
+    outra página), parte da última versão editada."""
+    ss = st.session_state
+    salvo, base = f"__editor_salvo__{chave}", f"__editor_base__{chave}"
+    if chave not in ss or base not in ss:
+        ss[base] = ss.get(salvo, df_inicial)
+    df = st.data_editor(ss[base], key=chave, **kwargs)
+    ss[salvo] = df
+    return df
+
+
+def definir_editor(chave: str, df: pd.DataFrame) -> None:
+    """Substitui o conteúdo de um editor (ex.: carregar exemplo). Use em callback (on_click)."""
+    ss = st.session_state
+    ss[f"__editor_salvo__{chave}"] = df
+    ss.pop(f"__editor_base__{chave}", None)
+    ss.pop(chave, None)

@@ -189,3 +189,19 @@ def test_sucs_estado_inicial_sem_conclusoes():
     assert botao.disabled
     textos = " ".join(c.value for c in at.caption)
     assert "grossa" not in textos and "linha A" not in textos
+
+
+def test_mct_laboratorio_exemplo_barbosa():
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/mct.py")
+    at.segmented_control(key="mct_modo").set_value("Laboratório").run()
+    at.selectbox(key="mct_lab_exemplo").set_value("Barbosa (2021), TCC UFJF (série de Parsons)").run()
+    _click(at, "Carregar exemplo")
+    assert at.radio(key="mct_lab_serie").value == "Parsons"
+    _click(at, "Calcular")
+    assert _grupo_na_tela(at, "LG'")
+    # tabelas e resultado sobrevivem à troca de página
+    _ir(at, "paginas/sucs.py")
+    _ir(at, "paginas/mct.py")
+    assert _grupo_na_tela(at, "LG'")
+    assert any("12 golpes, série Parsons" in m.value for m in at.markdown)
