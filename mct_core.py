@@ -487,8 +487,9 @@ def plot_point_on_abaco(c_: float, e_: float, ax=None, label: Optional[str] = No
         plot_mct_abaco(ax=ax)
     x = min(max(c_, C_MIN), C_MAX); y = min(max(e_, E_MIN), E_MAX)
     ax.scatter([x], [y], s=60, zorder=5, color="tab:red")
-    ax.annotate(label or f"(c'={fmt(c_, 2)}; e'={fmt(e_, 2)})", (x, y), xytext=(6, 8),
-                textcoords="offset points", fontsize=9)
+    perto_da_borda = x > C_MAX - 0.45
+    ax.annotate(label or f"(c'={fmt(c_, 2)}; e'={fmt(e_, 2)})", (x, y), xytext=(-6 if perto_da_borda else 6, 8),
+                textcoords="offset points", fontsize=9, ha="right" if perto_da_borda else "left")
     return (ax.figure, ax) if created else ax
 
 

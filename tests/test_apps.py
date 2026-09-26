@@ -216,3 +216,34 @@ def test_mct_anexo_b_mostra_todos_os_grupos_sem_cortes():
     at = _app("paginas/mct.py")
     at.segmented_control(key="mct_modo").set_value("Quadro dos grupos").run()
     assert not at.exception and any("<table" in m.value for m in at.markdown)
+
+
+def test_mct_ex_numerico_percorre_todas_as_etapas():
+    from didatica.ex_numerico_mct import ETAPAS
+    from didatica.glossario_mct import GLOSSARIO
+    assert all(k in GLOSSARIO for _, _, chaves in ETAPAS for k in chaves)
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/mct.py")
+    at.segmented_control(key="mct_modo").set_value("Ex. numérico").run()
+    assert not at.exception
+    for k in range(len(ETAPAS) - 1):
+        assert at.selectbox(key="mct_ex_etapa").value == k
+        _click(at, "Próxima")
+    assert at.selectbox(key="mct_ex_etapa").value == len(ETAPAS) - 1
+    assert any("LG'" in m.value for m in at.markdown)            # resumo com o grupo
+    _click(at, "◀ Anterior")
+    assert at.selectbox(key="mct_ex_etapa").value == len(ETAPAS) - 2
+    # a etapa escolhida sobrevive à troca de página
+    _ir(at, "paginas/sucs.py")
+    _ir(at, "paginas/mct.py")
+    assert at.selectbox(key="mct_ex_etapa").value == len(ETAPAS) - 2
+
+
+def test_mct_ex_numerico_abre_laboratorio():
+    at = _app("sucs_app.py")
+    _ir(at, "paginas/mct.py")
+    at.segmented_control(key="mct_modo").set_value("Ex. numérico").run()
+    at.selectbox(key="mct_ex_etapa").set_value(9).run()
+    _click(at, "Abrir no modo Laboratório")
+    assert at.segmented_control(key="mct_modo").value == "Laboratório"
+    assert at.radio(key="mct_lab_serie").value == "Parsons"

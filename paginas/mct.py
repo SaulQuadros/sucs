@@ -9,8 +9,10 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import streamlit as st
 
+from didatica.ex_numerico_mct import CREDITO, ETAPAS
+from didatica.glossario_mct import texto_markdown
 from didatica.mct_examples import build_excel_template_bytes_mct, template_df_mct
-from estado import (aviso_desatualizado, definir_editor, editor_persistente, keep, lote,
+from estado import (aviso_desatualizado, definir_editor, definir_valor, editor_persistente, keep, lote,
                     salvar_resultado, ultimo_resultado)
 from formato import fmt
 from mct_core import (GRUPOS, NORMA_CLA, NORMA_ME, PROPRIEDADES, MCTInput, build_report, tabela_anexo_b_html,
@@ -348,6 +350,60 @@ def modo_laboratorio(meta):
     mostrar_resultado(res, meta)
 
 
+EX_CHAVE = "mct_ex_etapa"
+EX_CSS = ("<style>.st-key-mct_ex_vars p, .st-key-mct_ex_vars li, .st-key-mct_ex_vars span "
+          "{font-size:0.86rem !important; line-height:1.42}</style>")
+
+
+def _ex_ir(delta: int):
+    i = st.session_state.get(EX_CHAVE, 0) + delta
+    definir_valor(EX_CHAVE, max(0, min(len(ETAPAS) - 1, i)))
+
+
+def _ex_abrir_laboratorio():
+    definir_valor("mct_modo", "Laboratório")
+    st.session_state["mct_lab_exemplo"] = next(k for k in EXEMPLOS_LAB if k.startswith("Barbosa"))
+    _carregar_exemplo()
+
+
+def _ex_navegacao(i: int, sufixo: str):
+    n = len(ETAPAS)
+    c1, c2, c3 = st.columns([1, 3, 1], vertical_alignment="center")
+    c1.button("◀ Anterior", key=f"ex_ant_{sufixo}", on_click=_ex_ir, args=(-1,), disabled=i == 0,
+              use_container_width=True)
+    c3.button("Próxima ▶", key=f"ex_prox_{sufixo}", on_click=_ex_ir, args=(1,), disabled=i == n - 1,
+              use_container_width=True)
+    return c2
+
+
+def modo_ex_numerico():
+    st.markdown(EX_CSS, unsafe_allow_html=True)
+    st.markdown("**Exemplo numérico — classificação MCT, série de Parsons.** Siga as etapas com os botões; ao lado "
+                "de cada cálculo, o painel explica as variáveis usadas.")
+    st.caption(CREDITO)
+    opcoes_estado = keep(EX_CHAVE, 0)
+    i = st.session_state[EX_CHAVE]
+    meio = _ex_navegacao(i, "topo")
+    meio.selectbox("Etapa", range(len(ETAPAS)), format_func=lambda k: f"{k + 1} · {ETAPAS[k][0]}",
+                   label_visibility="collapsed", **opcoes_estado)
+    st.progress((i + 1) / len(ETAPAS), text=f"Etapa {i + 1} de {len(ETAPAS)}")
+    titulo, funcao, chaves = ETAPAS[i]
+    c_calc, c_vars = st.columns([1.75, 1], gap="large")
+    with c_calc:
+        st.subheader(f"{i + 1}. {titulo}")
+        funcao()
+        if i == len(ETAPAS) - 1:
+            st.button("Abrir no modo Laboratório", type="primary", on_click=_ex_abrir_laboratorio)
+    with c_vars:
+        with st.container(border=True, key="mct_ex_vars"):
+            st.markdown("**Variáveis desta etapa**")
+            for k, chave in enumerate(chaves):
+                if k:
+                    st.divider()
+                st.markdown(texto_markdown(chave), unsafe_allow_html=True)
+    _ex_navegacao(i, "base")
+
+
 def _processar_lote(df):
     out = classify_dataframe_mct(df)
     if "grupo_esperado" in out.columns:
@@ -404,7 +460,8 @@ def modo_quadro():
 
 cabecalho()
 _meta = get_meta()
-_modo = st.segmented_control("Modo", ["Uma amostra", "Laboratório", "Lote (CSV/Excel)", "Quadro dos grupos"],
+_modo = st.segmented_control("Modo", ["Uma amostra", "Laboratório", "Lote (CSV/Excel)", "Quadro dos grupos",
+                                      "Ex. numérico"],
                              label_visibility="collapsed", required=True, **keep("mct_modo", "Uma amostra"))
 if _modo == "Lote (CSV/Excel)":
     modo_lote()
@@ -412,5 +469,7 @@ elif _modo == "Laboratório":
     modo_laboratorio(_meta)
 elif _modo == "Quadro dos grupos":
     modo_quadro()
+elif _modo == "Ex. numérico":
+    modo_ex_numerico()
 else:
     modo_amostra(_meta)

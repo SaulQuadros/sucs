@@ -107,3 +107,9 @@ def definir_editor(chave: str, df: pd.DataFrame) -> None:
     ss[f"__editor_salvo__{chave}"] = df
     ss.pop(f"__editor_base__{chave}", None)
     ss.pop(chave, None)
+
+
+def definir_valor(key: str, valor) -> None:
+    """Altera o valor de um widget gerido por keep() (ex.: botões anterior/próxima). Use em callback."""
+    st.session_state[key] = valor
+    st.session_state[_COPIA + key] = valor

@@ -254,17 +254,17 @@ def _fig(titulo, xl, yl):
     return fig, ax
 
 
-def plot_deformabilidade(R: ResultadoLab):
+def plot_deformabilidade(R: ResultadoLab, destacar: bool = True):
     fig, ax = _fig("Curvas de deformabilidade (Figura A10)", "10·log₁₀(nº de golpes)", "Afundamento an (mm)")
     for cp in R.cps:
         pts = R.curvas[cp.nome]
         ax.plot([10 * math.log10(n) for n, _ in pts], [a for _, a in pts], marker="o", ms=3.5, lw=1.2,
                 label=f"{cp.nome} (hc {fmt(cp.hc)}%)")
     ax.axhline(2.0, color="gray", ls=":", lw=1); ax.axvline(10.0, color="gray", ls=":", lw=1)
-    for jan in R.c_detalhe.get("janelas", ()):
+    for jan in (R.c_detalhe.get("janelas", ()) if destacar else ()):
         if jan:
             ax.plot([p[0] for p in jan], [p[1] for p in jan], color="black", lw=3.2, alpha=0.55, zorder=4)
-    if R.c_ is not None:
+    if destacar and R.c_ is not None:
         ax.text(0.98, 0.95, f"c' = {fmt(R.c_, 2)}", transform=ax.transAxes, ha="right", va="top",
                 fontsize=10, bbox=dict(fc="white", ec="gray", lw=0.6))
     ax.legend(fontsize=7.5)
@@ -272,7 +272,7 @@ def plot_deformabilidade(R: ResultadoLab):
     return fig
 
 
-def plot_compactacao(R: ResultadoLab):
+def plot_compactacao(R: ResultadoLab, destacar: bool = True):
     fig, ax = _fig("Curvas de compactação Mini-MCV (Figura A11)", "Umidade de compactação hc (%)", "MEAS (kg/m³)")
     nref = GOLPES_REF[R.serie]
     for n in CURVAS_COMPACTACAO[R.serie]:
@@ -280,7 +280,7 @@ def plot_compactacao(R: ResultadoLab):
         if len(pts) >= 2:
             ax.plot(*zip(*pts), marker="o", ms=3.5, lw=2.2 if n == nref else 1.0,
                     color="tab:red" if n == nref else None, label=f"{n} golpes" + (" (referência)" if n == nref else ""))
-    jan = R.d_detalhe.get("janela")
+    jan = R.d_detalhe.get("janela") if destacar else None
     if jan:
         ax.plot([p[0] for p in jan], [p[1] for p in jan], color="black", lw=3.2, alpha=0.55, zorder=4)
         ax.text(0.02, 0.95, f"d' = {fmt(R.d_, 1)} kg/m³/%", transform=ax.transAxes, va="top", fontsize=10,
