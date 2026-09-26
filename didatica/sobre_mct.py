@@ -186,7 +186,7 @@ def fluxograma():
 
 
 ETAPAS_SOBRE = [
-    ("Introdução", introducao, ["mct", "lateritico", "saprolitico", "grupos"]),
+    ("Introdução", introducao, ["mct", "normas", "lateritico", "saprolitico", "grupos"]),
     ("Fundamentos", fundamentos, ["lateritico", "saprolitico", "mini_mcv", "c", "e", "abaco"]),
     ("Fluxograma de ensaios", fluxograma, ["mini_proctor", "mini_cbr", "mini_mcv", "pi", "g_mct"],
      {"largura_total": True}),

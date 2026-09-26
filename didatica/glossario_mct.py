@@ -13,6 +13,15 @@ GLOSSARIO = {
                 "**comportamento laterítico (L)** dos de **comportamento não laterítico (N)**.",
         no_ensaio="Reúne dois ensaios da DNIT 258/2023-ME: a compactação Mini-MCV e a perda de massa por imersão.",
         nas_equacoes="É o método; o resultado é um dos sete grupos do ábaco."),
+    "normas": dict(
+        termo="Normas DNIT 258/2023-ME e DNIT 259/2023-CLA", simbolo="", unidade="—",
+        norma="Lista de normas IPR de 24/09/2026",
+        o_que_e="A **258/2023-ME** (Método de Ensaio) descreve os ensaios Mini-MCV e de perda de massa por imersão "
+                "e o cálculo de afundamento, Mini-MCV, c′, d′ e Pi. A **259/2023-CLA** (Classificação) define Pi′, "
+                "e′ e o ábaco com os grupos. Substituem as DNER-ME 256/94, DNER-ME 258/94 e DNER-CLA 259/96.",
+        no_ensaio="Completam o conjunto a DNIT 228/2023-ME (Mini-Proctor), a DNIT 254/2023-ME (Mini-CBR e expansão) "
+                  "e a DNIT 444/2023-CLA (G-MCT).",
+        nas_equacoes="As seções citadas nas fórmulas (3.8, 3.9, 3.10, 3.12, 3.13) são dessas duas normas."),
     "cp": dict(
         termo="Corpo de prova", simbolo="CP", unidade="—", norma="DNIT 258/2023-ME, seções 4 a 7",
         o_que_e="Amostra compactada no molde cilíndrico de 50 mm do equipamento miniatura, com cerca de 200 g de "
