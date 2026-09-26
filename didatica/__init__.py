@@ -1,8 +1,1 @@
-#!/usr/bin/env python
-# coding: utf-8
-
-# In[ ]:
-
-
-
-
+# didatica — utilitários didáticos (ficha de exercício em PDF, modelos de planilha).

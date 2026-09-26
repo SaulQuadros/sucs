@@ -1,65 +1,74 @@
-# Classificador SUCS — DNIT (Streamlit)
+# SoilClass — Classificação de solos SUCS, TRB e MCT (DNIT)
 
-App web para classificar solos pelo **SUCS** (Sistema Unificado de Classificação de Solos), seguindo a prática do DNIT.
-- Calcula **IP = LL − LP** e usa a **linha A** (IP = 0,73 · (LL − 20)) para distinguir **M × C**.
-- Decide **L × H** por **LL < 50**.
-- Para granulação grossa (≥ 50% retido na #200), decide **G × S** e, com finos < 5%, permite **GW/GP** ou **SW/SP** via **Cu/Cc**.
-- Suporta casos orgânicos (**OL/OH**) e turfa (**Pt**).
-- Inclui **classificação em lote (CSV)** e **gráfico de plasticidade**.
+App Streamlit para classificar solos e geomateriais para pavimentação, com as regras do
+**Manual de Pavimentação DNIT (IPR-719/2006, versão corrigida com a Errata 1)** e das normas DNIT vigentes
+(lista IPR de 24/09/2026).
+
+| Página | Classificação | Referências |
+|---|---|---|
+| `sucs_app.py` (principal) | SUCS | Manual IPR-719: Tabela 5, Figura 17, fluxograma de identificação, Tabelas 12 e 13 |
+| `pages/trb_app.py` | TRB (HRB/AASHTO) + Índice de Grupo | Manual IPR-719: Tabela 4, Tabelas 11 e 14 |
+| `pages/mct_app.py` | MCT (solos finos tropicais) | DNIT 259/2023-CLA (Figura A1, Anexos B e C); ensaios DNIT 258/2023-ME; Tabela 15 do Manual |
+
+Ensaios de caracterização: granulometria **DNIT 459/2025-ME** (substitui DNER-ME 051/94 e 080/94),
+LL **DNER-ME 122/94**, LP **DNER-ME 082/94**.
 
 ## ▶️ Executar localmente
 
 ```bash
-git clone <SEU_REPO_GITHUB>.git
-cd <SEU_REPO_GITHUB>
 pip install -r requirements.txt
-streamlit run streamlit_app.py
+streamlit run sucs_app.py
 ```
 
-## ☁️ Deploy no Streamlit Community Cloud
+Testes automatizados (regras, planilhas-modelo e páginas):
 
-1. Crie um repositório no GitHub com estes arquivos (use este diretório como base).  
-2. No [streamlit.io](https://streamlit.io/cloud), clique em **New app**, selecione o repositório e informe:  
-   - **Branch:** `main` (ou a que você usar)  
-   - **Main file path:** `streamlit_app.py`  
-3. Deploy! Não precisa de secrets.
+```bash
+pip install pytest
+pytest
+```
+
+## ☁️ Streamlit Community Cloud
+
+- **Main file path:** `sucs_app.py` (as demais páginas ficam em `pages/`).
+- Configuração em `.streamlit/config.toml`. Não precisa de secrets.
+- `mct_app.py` na raiz apenas repassa para `pages/mct_app.py` (compatibilidade).
+
+## ⚙️ Regras implementadas (resumo)
+
+**SUCS**
+- Mais de 50% retido na #200 → grossa; 50% ou mais passando → fina.
+- G quando 50% ou mais da fração graúda fica retida na #4; senão S.
+- Finos < 5%: W/P por Cu e Cc (pedregulho Cu ≥ 4; areia Cu ≥ 6; 1 ≤ Cc ≤ 3). Cu/Cc podem vir de D10, D30, D60.
+- Finos 5–12%: símbolo duplo (ex.: SW-SM, GP-GC).
+- Finos > 12%: GM/SM abaixo da linha A, GC/SC acima, GM-GC/SM-SC na zona hachurada.
+- Finos: linha A IP = 0,73(LL − 20); L se LL ≤ 50; zona hachurada (4 ≤ IP ≤ 7 acima da linha A) → ML-CL;
+  orgânicos abaixo da linha A → OL/OH; turfa → PT.
+
+**TRB**
+- Eliminação da esquerda para a direita no quadro; A-1 sem critério de LL; A-3 exige NP.
+- Limites inteiros com valores decimais: LL > 40 = "41 mín."; IP > 10 = "11 mín."; #40 > 50 = "51 mín.".
+- IG = 0,2a + 0,005ac + 0,01bd, com aviso quando excede o máximo do quadro para o grupo.
+
+**MCT**
+- Pi' (item 3.8): AF no Mini-MCV 10 ≥ 48 mm → Pi a Mini-MCV 10; AF < 48 mm → Pi a Mini-MCV 15.
+- e' = ∛(Pi'/100 + 20/d'), com d' da curva de 10 golpes (série simplificada) ou 12 (Parsons).
+- Ábaco da Figura A1 pelos vértices cotados: (0,27; 2,2), (0,45; 1,75), (0,59; 1,4), (0,70; 1,15), (1,7; 1,15) e c' = 1,5.
+- Critério de desempate perto da fronteira L|N (item 5.1 c).
 
 ## 📁 Estrutura
 
 ```
-.
-├── streamlit_app.py        # App web (UI)
-├── sucs_core.py            # Lógica SUCS (reutilizável em scripts/planilhas)
-├── requirements.txt        # Dependências
-├── .streamlit/
-│   └── config.toml         # Configuração do servidor/tema
-├── samples.csv             # Exemplo de CSV para lote
-├── LICENSE                 # MIT
-└── README.md               # Este arquivo
+sucs_app.py            página SUCS (principal)
+pages/trb_app.py       página TRB
+pages/mct_app.py       página MCT
+sucs_core.py           regras SUCS
+trb_core.py, trb_defs.py   regras e tabelas TRB
+mct_core.py            regras e ábaco MCT
+xlsx_utils.py          geração de planilhas Excel
+didatica/              ficha de exercício (PDF) e modelo de planilha MCT
+tests/                 testes automatizados (pytest)
+samples.csv            exemplo de lote SUCS (um solo por grupo)
 ```
-
-## 🧪 CSV em lote (colunas esperadas)
-
-```
-projeto,tecnico,amostra,pct_retido_200,pct_pedregulho_coarse,pct_areia_coarse,LL,LP,Cu,Cc,organico,turfa
-```
-- `organico` e `turfa` podem ser `True/False` ou `1/0`.
-- `Cu` e `Cc` só são usados para decidir **W/P** quando os finos são `< 5%`.
-
-## ⚙️ Regras implementadas (resumo)
-
-- **Split grossa/fina:** `≥ 50%` retido na #200 ⇒ grossa; senão fina.  
-- **Grossa (G/S):**
-  - G se pedregulho (> #4) ≥ areia (fração > #200); senão S.  
-  - Finos `< 5%` ⇒ usar **Cu/Cc**:  
-    - **Areias (S):** `Cu ≥ 6` e `1 ≤ Cc ≤ 3` ⇒ **SW**; senão **SP**.  
-    - **Cascalhos (G):** `Cu ≥ 4` e `1 ≤ Cc ≤ 3` ⇒ **GW**; senão **GP**.  
-  - Finos `5–12%` ⇒ **limítrofe** (símbolo duplo), combinando graduação e natureza dos finos.  
-  - Finos `> 12%` ⇒ **GM/GC** ou **SM/SC** conforme M/C.  
-- **Fina:** Linha A define **M × C**; `LL < 50` define **L × H** ⇒ **ML, CL, MH, CH**.  
-- **Orgânico:** **OL/OH**; **Pt** para materiais altamente orgânicos (turfas).
-
-> **Atenção**: entradas devem se referir à mesma amostra e à fração indicada (ex.: pedregulho/areia na **fração > #200**).
 
 ## 📜 Licença
 MIT — veja `LICENSE`.
