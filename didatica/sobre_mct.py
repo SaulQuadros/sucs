@@ -103,60 +103,75 @@ Parsons e aplica dois critérios de desempate (item 5.1 c).
 AZUL, AZUL_CLARO, CINZA, CINZA_CLARO = "#1F4E79", "#DCE8F5", "#555555", "#F2F2F2"
 
 
+PAD_CAIXA = 0.02   # pad do boxstyle: a borda desenhada fica PAD além do retângulo nominal
+
+
 def _caixa(ax, x, y, w, h, texto, destaque=False, fs=10.5, negrito=False):
-    ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.02,rounding_size=0.08",
+    """Desenha a caixa e devolve as bordas desenhadas (esquerda, direita, base, topo)."""
+    ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h,
+                                boxstyle=f"round,pad={PAD_CAIXA},rounding_size=0.08",
                                 fc=AZUL_CLARO if destaque else CINZA_CLARO,
-                                ec=AZUL if destaque else CINZA, lw=2.0 if destaque else 1.0))
+                                ec=AZUL if destaque else CINZA, lw=2.0 if destaque else 1.0, zorder=2))
     ax.text(x, y, texto, ha="center", va="center", fontsize=fs, fontweight="bold" if negrito else "normal",
-            color="#10263d" if destaque else "#222222", linespacing=1.25)
+            color="#10263d" if destaque else "#222222", linespacing=1.25, zorder=3)
+    return x - w / 2 - PAD_CAIXA, x + w / 2 + PAD_CAIXA, y - h / 2 - PAD_CAIXA, y + h / 2 + PAD_CAIXA
 
 
 def _seta(ax, x0, y0, x1, y1, destaque=False):
-    ax.annotate("", xy=(x1, y1), xytext=(x0, y0),
-                arrowprops=dict(arrowstyle="-|>", lw=1.8 if destaque else 1.0,
-                                color=AZUL if destaque else CINZA, shrinkA=0, shrinkB=0))
+    """Seta cuja ponta toca exatamente (x1, y1), a borda da caixa de destino."""
+    ax.annotate("", xy=(x1, y1), xytext=(x0, y0), zorder=1,
+                arrowprops=dict(arrowstyle="-|>,head_length=0.5,head_width=0.25", lw=1.8 if destaque else 1.0,
+                                color=AZUL if destaque else CINZA, shrinkA=0, shrinkB=0,
+                                joinstyle="miter", capstyle="butt"))
+
+
+def _coluna(ax, x, caixas, destaque=False):
+    """Empilha caixas (y, h, texto, kw) na coluna x, ligando base → topo por setas."""
+    bordas = []
+    for y, h, texto, kw in caixas:
+        bordas.append(_caixa(ax, x, y, 3.3, h, texto, destaque=destaque, **kw))
+    for (_, _, base, _), (_, _, _, topo) in zip(bordas, bordas[1:]):
+        _seta(ax, x, base, x, topo, destaque=destaque)
+    return bordas
 
 
 def plot_fluxograma():
     """Fluxograma da metodologia MCT (redesenhado): destaca o caminho da classificação."""
     fig, ax = plt.subplots(figsize=(12, 8.2))
     ax.set_xlim(0, 12); ax.set_ylim(0, 8.4); ax.axis("off")
-    _caixa(ax, 6, 7.8, 3.4, 0.7, "METODOLOGIA MCT\n(Nogami e Villibor)", fs=10, negrito=True)
-    # linha de distribuição
-    ax.plot([2, 10], [7.1, 7.1], color=CINZA, lw=1.0)
-    ax.plot([6, 6], [7.45, 7.1], color=CINZA, lw=1.0)
-    for x in (2, 10):
-        _seta(ax, x, 7.1, x, 6.85)
-    _seta(ax, 6, 7.1, 6, 6.85, destaque=True)
+    _, _, base_mct, _ = _caixa(ax, 6, 7.8, 3.4, 0.7, "METODOLOGIA MCT\n(Nogami e Villibor)", fs=10, negrito=True)
     # grupos
-    _caixa(ax, 2, 6.45, 3.3, 0.8, "Grupo Mini-CBR\ne ensaios associados", negrito=True)
-    _caixa(ax, 6, 6.45, 3.3, 0.8, "Grupo Mini-MCV\n(classificação)", destaque=True, negrito=True)
-    _caixa(ax, 10, 6.45, 3.3, 0.8, "Ensaios in situ", negrito=True)
-    # grupo Mini-CBR
-    _seta(ax, 2, 6.05, 2, 5.55)
-    _caixa(ax, 2, 5.15, 3.3, 0.8, "Compactação Mini-Proctor\nDNIT 228/2023-ME")
-    _seta(ax, 2, 4.75, 2, 4.25)
-    _caixa(ax, 2, 3.85, 3.3, 0.8, "Mini-CBR e expansão\nDNIT 254/2023-ME")
-    _seta(ax, 2, 3.45, 2, 2.95)
-    _caixa(ax, 2, 2.3, 3.3, 1.3, "Ensaios associados*\ncontração · infiltrabilidade\npermeabilidade\npenetração da imprimadura")
-    # grupo Mini-MCV (classificação)
-    _seta(ax, 6, 6.05, 6, 5.55, destaque=True)
-    _caixa(ax, 6, 5.15, 3.3, 0.8, "Compactação Mini-MCV\nDNIT 258/2023-ME → c′ e d′", destaque=True)
-    _seta(ax, 6, 4.75, 6, 4.25, destaque=True)
-    _caixa(ax, 6, 3.85, 3.3, 0.8, "Perda de massa por imersão\nDNIT 258/2023-ME → Pi′", destaque=True)
-    _seta(ax, 6, 3.45, 6, 2.95, destaque=True)
-    _caixa(ax, 6, 2.55, 3.3, 0.8, "c′ · d′ · Pi′\ne′ = ∛(Pi′/100 + 20/d′)", destaque=True)
-    _seta(ax, 6, 2.15, 6, 1.65, destaque=True)
-    _caixa(ax, 6, 1.1, 3.3, 1.1, "CLASSIFICAÇÃO MCT\nDNIT 259/2023-CLA (finos)\nDNIT 444/2023-CLA (G-MCT, grossos)",
-           destaque=True, negrito=True, fs=10)
-    # in situ
-    for y, txt in ((5.15, "Mini-CBR com\npenetrômetro*"), (4.05, "Mini-CBR de campo —\nprocedimento dinâmico*"),
-                   (2.95, "Mini-MCV —\ncontrole de umidade*")):
-        _caixa(ax, 10.55, y, 2.5, 0.85, txt, fs=9.6)
-    ax.plot([9.1, 9.1], [6.05, 2.95], color=CINZA, lw=1.0)
-    for y in (5.15, 4.05, 2.95):
-        _seta(ax, 9.1, y, 9.4, y)
-    ax.plot([9.1, 10], [6.05, 6.05], color=CINZA, lw=1.0)
+    cbr = _coluna(ax, 2, [
+        (6.45, 0.8, "Grupo Mini-CBR\ne ensaios associados", {"negrito": True}),
+        (5.15, 0.8, "Compactação Mini-Proctor\nDNIT 228/2023-ME", {}),
+        (3.85, 0.8, "Mini-CBR e expansão\nDNIT 254/2023-ME", {}),
+        (2.3, 1.3, "Ensaios associados*\ncontração · infiltrabilidade\npermeabilidade\npenetração da imprimadura", {}),
+    ])
+    mcv = _coluna(ax, 6, [
+        (6.45, 0.8, "Grupo Mini-MCV\n(classificação)", {"negrito": True}),
+        (5.15, 0.8, "Compactação Mini-MCV\nDNIT 258/2023-ME → c′ e d′", {}),
+        (3.85, 0.8, "Perda de massa por imersão\nDNIT 258/2023-ME → Pi′", {}),
+        (2.55, 0.8, "c′ · d′ · Pi′\ne′ = ∛(Pi′/100 + 20/d′)", {}),
+        (1.1, 1.1, "CLASSIFICAÇÃO MCT\nDNIT 259/2023-CLA (finos)\nDNIT 444/2023-CLA (G-MCT, grossos)",
+         {"negrito": True, "fs": 10}),
+    ], destaque=True)
+    situ = _caixa(ax, 10, 6.45, 3.3, 0.8, "Ensaios in situ", negrito=True)
+    # linha de distribuição
+    y_dist = 7.1
+    ax.plot([2, 10], [y_dist, y_dist], color=CINZA, lw=1.0, zorder=1)
+    ax.plot([6, 6], [base_mct, y_dist], color=CINZA, lw=1.0, zorder=1)
+    for x, topo in ((2, cbr[0][3]), (10, situ[3])):
+        _seta(ax, x, y_dist, x, topo)
+    _seta(ax, 6, y_dist, 6, mcv[0][3], destaque=True)
+    # in situ: tronco saindo da base da caixa, ramos até a borda esquerda de cada item
+    x_tronco = 9.1
+    ys = (5.15, 4.05, 2.95)
+    esquerdas = [_caixa(ax, 10.55, y, 2.5, 0.85, txt, fs=9.6)[0] for y, txt in zip(ys, (
+        "Mini-CBR com\npenetrômetro*", "Mini-CBR de campo —\nprocedimento dinâmico*",
+        "Mini-MCV —\ncontrole de umidade*"))]
+    ax.plot([x_tronco, x_tronco], [situ[2], ys[-1]], color=CINZA, lw=1.0, zorder=1)
+    for y, esq in zip(ys, esquerdas):
+        _seta(ax, x_tronco, y, esq, y)
     # legenda
     ax.add_patch(FancyBboxPatch((0.35, 0.25), 0.35, 0.25, boxstyle="round,pad=0.01", fc=AZUL_CLARO, ec=AZUL, lw=2))
     ax.text(0.85, 0.37, "ensaios e etapas que fornecem a classificação MCT", fontsize=9.5, va="center")
