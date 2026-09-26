@@ -1,4 +1,4 @@
-# pages/trb_app.py
+# paginas/trb.py
 # Classificação TRB (HRB/AASHTO) — Tabela 4 do Manual de Pavimentação DNIT (IPR-719/2006).
 import io
 
@@ -8,6 +8,7 @@ import streamlit as st
 from didatica.generator_pdf import generate_random_sucs_pdf
 from trb_core import classify_trb, classify_dataframe_trb, GROUP_DESC, ig_label, EXEMPLOS
 from trb_defs import cbr_for_trb, sucs_provavel
+from projeto import get_meta
 from xlsx_utils import resolve_xlsx_engine, to_xlsx_bytes
 
 META_COLS = ["Nome do projeto", "Técnico responsável", "Código da amostra"]
@@ -46,7 +47,6 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> bytes:
     return mem.getvalue()
 
 
-st.set_page_config(page_title="Classificador TRB - DNIT")
 st.title("Classificador TRB — DNIT")
 st.caption("Quadro de classificação (Tabela 4), Índice de Grupo e Tabelas 11 e 14 do Manual de Pavimentação "
            "DNIT (IPR-719/2006, versão corrigida com a Errata 1). Granulometria: DNIT 459/2025-ME.")
@@ -73,11 +73,8 @@ try:
 except Exception as _e:
     st.caption("Não foi possível gerar o modelo em Excel: " + str(_e))
 
-with st.sidebar:
-    st.header("Projeto")
-    projeto = st.text_input("Nome do projeto")
-    tecnico = st.text_input("Técnico responsável")
-    amostra = st.text_input("Código da amostra")
+meta = get_meta()
+projeto, tecnico, amostra = meta["projeto"], meta["tecnico"], meta["amostra"]
 
 st.subheader("Granulometria (% passante)")
 cg1, cg2, cg3 = st.columns(3)

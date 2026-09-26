@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-# pages/mct_app.py
+# paginas/mct.py
 # Classificação MCT de solos finos tropicais — DNIT 259/2023-CLA (ensaios: DNIT 258/2023-ME).
 from __future__ import annotations
 
@@ -8,21 +8,15 @@ import pandas as pd
 import streamlit as st
 
 from didatica.mct_examples import build_excel_template_bytes_mct, template_df_mct
+from projeto import get_meta
 from mct_core import (MCTInput, NORMA_CLA, NORMA_ME, PROPRIEDADES, GRUPOS, build_report,
                       classify_dataframe_mct, classify_from_inputs, plot_mct_abaco, plot_point_on_abaco)
 
-# NÃO chamar st.set_page_config aqui (evita conflito com o script principal)
+# A configuração da página (st.set_page_config) fica no roteador sucs_app.py.
 
 PROP_LABELS = {"granulometria": "Granulometria típica", "mini_cbr_sem_imersao": "Mini-CBR sem imersão",
                "perda_suporte_imersao": "Perda de suporte por imersão", "expansao": "Expansão",
                "contracao": "Contração", "permeabilidade": "Permeabilidade", "plasticidade": "Plasticidade"}
-
-
-def sidebar_meta() -> dict:
-    st.sidebar.markdown("### 📄 Identificação")
-    return {"projeto": st.sidebar.text_input("Nome do projeto", key="mct_meta_projeto").strip(),
-            "tecnico": st.sidebar.text_input("Técnico responsável", key="mct_meta_tecnico").strip(),
-            "amostra": st.sidebar.text_input("Código da amostra", key="mct_meta_amostra").strip()}
 
 
 def _br(x, nd=3) -> str:
@@ -161,7 +155,7 @@ def main():
     st.title("Classificação MCT — solos finos tropicais")
     st.caption(f"Conforme a norma **{NORMA_CLA}** (Figura A1, Anexos B e C), com ensaios Mini-MCV e perda de "
                f"massa por imersão pela **{NORMA_ME}**. e' = ∛(Pi'/100 + 20/d').")
-    meta = sidebar_meta()
+    meta = get_meta()
     modo = st.radio("Modo", ["Uma amostra", "Lote (CSV/Excel)", "Quadro dos grupos"], horizontal=True)
     if modo == "Uma amostra":
         ui_individual(meta)

@@ -1,6 +1,6 @@
 # mct_app.py
-# Repasse para a página MCT (pages/mct_app.py), mantido por compatibilidade com implantações antigas.
+# Mantido por compatibilidade com implantações antigas: abre o app completo (sucs_app.py).
 import os
 import runpy
 
-runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "pages", "mct_app.py"), run_name="__main__")
+runpy.run_path(os.path.join(os.path.dirname(os.path.abspath(__file__)), "sucs_app.py"), run_name="__main__")

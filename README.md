@@ -6,9 +6,9 @@ App Streamlit para classificar solos e geomateriais para pavimentação, com as 
 
 | Página | Classificação | Referências |
 |---|---|---|
-| `sucs_app.py` (principal) | SUCS | Manual IPR-719: Tabela 5, Figura 17, fluxograma de identificação, Tabelas 12 e 13 |
-| `pages/trb_app.py` | TRB (HRB/AASHTO) + Índice de Grupo | Manual IPR-719: Tabela 4, Tabelas 11 e 14 |
-| `pages/mct_app.py` | MCT (solos finos tropicais) | DNIT 259/2023-CLA (Figura A1, Anexos B e C); ensaios DNIT 258/2023-ME; Tabela 15 do Manual |
+| `paginas/sucs.py` | SUCS | Manual IPR-719: Tabela 5, Figura 17, fluxograma de identificação, Tabelas 12 e 13 |
+| `paginas/trb.py` | TRB (HRB/AASHTO) + Índice de Grupo | Manual IPR-719: Tabela 4, Tabelas 11 e 14 |
+| `paginas/mct.py` | MCT (solos finos tropicais) | DNIT 259/2023-CLA (Figura A1, Anexos B e C); ensaios DNIT 258/2023-ME; Tabela 15 do Manual |
 
 Ensaios de caracterização: granulometria **DNIT 459/2025-ME** (substitui DNER-ME 051/94 e 080/94),
 LL **DNER-ME 122/94**, LP **DNER-ME 082/94**.
@@ -29,9 +29,16 @@ pytest
 
 ## ☁️ Streamlit Community Cloud
 
-- **Main file path:** `sucs_app.py` (as demais páginas ficam em `pages/`).
+- **Main file path:** `sucs_app.py` — roteador com o menu da barra superior (`st.navigation`); as páginas ficam em `paginas/`.
+- Endereços: `/` (SUCS), `/trb_app` (TRB), `/mct_app` (MCT).
 - Configuração em `.streamlit/config.toml`. Não precisa de secrets.
-- `mct_app.py` na raiz apenas repassa para `pages/mct_app.py` (compatibilidade).
+- `mct_app.py` na raiz apenas abre o app completo (compatibilidade).
+
+## 🧭 Menu
+
+O menu fica na barra superior. Cada chave de `MENUS` em `sucs_app.py` é um menu suspenso
+(hoje: **Classificação de Solos** → SUCS, TRB, MCT). Novos módulos entram como novas chaves.
+Para usar o menu lateral em vez da barra superior, troque `position="top"` por `position="sidebar"`.
 
 ## ⚙️ Regras implementadas (resumo)
 
@@ -58,9 +65,11 @@ pytest
 ## 📁 Estrutura
 
 ```
-sucs_app.py            página SUCS (principal)
-pages/trb_app.py       página TRB
-pages/mct_app.py       página MCT
+sucs_app.py            ponto de entrada: menu superior (MENUS) e barra lateral do projeto
+projeto.py             identificação do projeto, compartilhada entre as páginas
+paginas/sucs.py        página SUCS
+paginas/trb.py         página TRB
+paginas/mct.py         página MCT
 sucs_core.py           regras SUCS
 trb_core.py, trb_defs.py   regras e tabelas TRB
 mct_core.py            regras e ábaco MCT
