@@ -269,6 +269,45 @@ def _swap_L_N(group: str, c_: float) -> str:
     return classify_mct(c_, e_test)[0]
 
 
+def fronteiras_proximas(c_: float, e_: float, tol: float = 0.03) -> List[str]:
+    """Fronteiras do ábaco (exceto a L|N, tratada pelo item 5.1 c) a menos de `tol` do ponto.
+    Informativo: indica onde uma leitura gráfica pode levar ao grupo vizinho."""
+    g = classify_mct(c_, e_)[0]
+    avisos = []
+
+    def vizinho(c2, e2):
+        return classify_mct(c2, e2)[0]
+
+    lateritico = e_ <= fronteira_L_N(c_)
+    if lateritico:
+        for cv in (C_LA_LA, C_A_G):
+            if abs(c_ - cv) <= tol:
+                g2 = vizinho(2 * cv - c_ + (1e-6 if c_ <= cv else -1e-6), e_)
+                if g2 != g:
+                    avisos.append(f"c' = {fmt(c_, 3)} a {fmt(abs(c_ - cv), 3)} da vertical c' = {fmt(cv, 2)} "
+                                  f"(fronteira {g} | {g2})")
+    else:
+        c_na = _interp(LINHA_NA, e_, by="e")
+        if abs(c_ - c_na) <= tol:
+            g2 = vizinho(2 * c_na - c_, e_)
+            if g2 != g:
+                avisos.append(f"c' = {fmt(c_, 3)} a {fmt(abs(c_ - c_na), 3)} da linha inclinada NA "
+                              f"(fronteira {g} | {g2})")
+        if LINHA_NS_NA[0][0] <= c_ <= C_NA_NG:
+            e_l = _interp(LINHA_NS_NA, c_)
+            if abs(e_ - e_l) <= tol:
+                g2 = vizinho(c_, 2 * e_l - e_)
+                if g2 != g:
+                    avisos.append(f"e' = {fmt(e_, 3)} a {fmt(abs(e_ - e_l), 3)} da linha inclinada "
+                                  f"(0,45; 1,75)–(1,7; 1,15) (fronteira {g} | {g2})")
+        if e_ > _interp(LINHA_NS_NA, C_A_G) and abs(c_ - C_A_G) <= tol:
+            g2 = vizinho(2 * C_A_G - c_, e_)
+            if g2 != g:
+                avisos.append(f"c' = {fmt(c_, 3)} a {fmt(abs(c_ - C_A_G), 3)} da vertical c' = 1,50 "
+                              f"(fronteira {g} | {g2})")
+    return avisos
+
+
 def classify_from_inputs(inp: MCTInput, *, tolerancia_LN: float = 0.05) -> MCTResult:
     """Classificação completa: valida entradas, obtém Pi', calcula e' e aplica o ábaco.
     tolerancia_LN: faixa de e' em torno da fronteira L|N considerada "próxima" (item 5.1 c)."""
@@ -320,6 +359,9 @@ def classify_from_inputs(inp: MCTInput, *, tolerancia_LN: float = 0.05) -> MCTRe
                      + (f" (grupo ajustado de {g} para {novo})" if novo != g else ""))
             g = novo
 
+    for f in fronteiras_proximas(c, e):
+        w.append("Ponto próximo de fronteira do ábaco: " + f + ". Leituras gráficas podem indicar o grupo "
+                 "vizinho; confira os coeficientes.")
     return MCTResult(group=g, c_=c, e_=e, pi_ref=pi_ref, densidade=dens, rationale=r, warnings=w)
 
 
