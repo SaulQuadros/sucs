@@ -52,7 +52,7 @@ def build_results_xlsx_trb(df: pd.DataFrame) -> bytes:
 
 
 def cabecalho():
-    c_tit, c_crit, c_ref = st.columns([5, 1.2, 1.5], vertical_alignment="bottom")
+    c_tit, c_crit, c_ref = st.columns([4, 1.5, 1.8], vertical_alignment="bottom")
     c_tit.title("Classificação TRB")
     with c_crit.popover("Critérios", use_container_width=True):
         st.markdown("\n".join([

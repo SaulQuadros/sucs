@@ -74,6 +74,37 @@ PROPRIEDADES = {
             "permeabilidade": "Baixa", "plasticidade": "Média a alta"},
 }
 
+ROTULOS_ANEXO_B = {"granulometria": "Granulometria típica", "mini_cbr_sem_imersao": "Mini-CBR sem imersão",
+                   "perda_suporte_imersao": "Perda de suporte por imersão", "expansao": "Expansão",
+                   "contracao": "Contração", "permeabilidade": "Permeabilidade", "plasticidade": "Plasticidade"}
+ORDEM_ANEXO_B = ["NA", "NA'", "NS'", "NG'", "LA", "LA'", "LG'"]   # como no Anexo B da DNIT 259/2023-CLA
+
+
+def tabela_anexo_b_html() -> str:
+    """Anexo B em HTML: largura total, texto quebrado dentro das células e cabeçalho agrupado por classe,
+    para que todos os grupos fiquem legíveis sem rolagem nem ajuste manual de colunas."""
+    borda = "1px solid rgba(128,128,128,0.35)"
+    cel = f"border:{borda};padding:6px 8px;vertical-align:top;overflow-wrap:break-word;hyphens:auto"
+    cab = cel + ";text-align:center;background:rgba(128,128,128,0.10);font-weight:600"
+    n_n = sum(g.startswith("N") for g in ORDEM_ANEXO_B)
+    # hifenização em pt-BR nas colunas estreitas; rolagem horizontal só abaixo de 540 px (celular)
+    html = ["<div style='overflow-x:auto'>",
+            "<table lang='pt-BR' style='width:100%;min-width:540px;table-layout:fixed;border-collapse:collapse;"
+            "font-size:0.9rem'>",
+            "<colgroup><col style='width:16%'>" + "<col>" * len(ORDEM_ANEXO_B) + "</colgroup>",
+            f"<tr><th style='{cab}'>Classes</th>"
+            f"<th colspan='{n_n}' style='{cab}'>N — solos de comportamento não laterítico</th>"
+            f"<th colspan='{len(ORDEM_ANEXO_B) - n_n}' style='{cab}'>L — solos de comportamento laterítico</th></tr>",
+            f"<tr><th style='{cab}'>Grupos</th>" + "".join(
+                f"<th style='{cab}'>{g}<br><span style='font-weight:400'>{PROPRIEDADES[g]['nome']}</span></th>"
+                for g in ORDEM_ANEXO_B) + "</tr>"]
+    for k, rotulo in ROTULOS_ANEXO_B.items():
+        html.append(f"<tr><th style='{cel};text-align:left;font-weight:600'>{rotulo}</th>"
+                    + "".join(f"<td style='{cel}'>{PROPRIEDADES[g][k]}</td>" for g in ORDEM_ANEXO_B) + "</tr>")
+    html.append("</table></div>")
+    return "".join(html)
+
+
 # Anexo C (normativo) da DNIT 259/2023-CLA — breve descrição e correlação pedológica/geológica
 DESCRICOES = {
     "LA":  ("São solos pouco coesivos e com alto módulo de resiliência, compostos por areias com poucos "

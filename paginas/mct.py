@@ -13,7 +13,7 @@ from didatica.mct_examples import build_excel_template_bytes_mct, template_df_mc
 from estado import (aviso_desatualizado, definir_editor, editor_persistente, keep, lote,
                     salvar_resultado, ultimo_resultado)
 from formato import fmt
-from mct_core import (GRUPOS, NORMA_CLA, NORMA_ME, PROPRIEDADES, MCTInput, build_report,
+from mct_core import (GRUPOS, NORMA_CLA, NORMA_ME, PROPRIEDADES, MCTInput, build_report, tabela_anexo_b_html,
                       classify_dataframe_mct, classify_from_inputs, compute_e_prime, pi_referencia,
                       plot_mct_abaco, plot_point_on_abaco)
 from mct_lab import (EXEMPLOS_LAB, SERIES, calcular, de_tabelas, numerico, para_tabelas, plot_af, plot_compactacao,
@@ -28,7 +28,7 @@ CINZA = "<span style='color:gray;font-size:0.8rem'>{}</span>"
 
 
 def cabecalho():
-    c_tit, c_crit, c_ref = st.columns([5, 1.2, 1.5], vertical_alignment="bottom")
+    c_tit, c_crit, c_ref = st.columns([4, 1.5, 1.8], vertical_alignment="bottom")
     c_tit.title("Classificação MCT")
     with c_crit.popover("Critérios", use_container_width=True):
         st.markdown("\n".join([
@@ -392,12 +392,11 @@ def modo_lote():
 
 
 def modo_quadro():
-    c_t, c_g = st.columns([1.4, 1], gap="large")
-    with c_t:
-        st.markdown(f"**Anexo B — Propriedades típicas dos grupos** ({NORMA_CLA})")
-        st.dataframe(pd.DataFrame({g: {**{"Classe": PROPRIEDADES[g]["classe"]},
-                                       **{PROP_LABELS[k]: PROPRIEDADES[g][k] for k in PROP_LABELS}}
-                                   for g in GRUPOS}), use_container_width=True)
+    st.markdown(f"**Anexo B — Propriedades típicas dos grupos de solos** ({NORMA_CLA})")
+    st.markdown(tabela_anexo_b_html(), unsafe_allow_html=True)
+    st.caption("Granulometria típica: q = quartzo; m = micas; k = caulinita. Propriedades de corpos de prova "
+               "compactados na umidade ótima, energia normal, com sobrecarga padrão quando pertinente.")
+    _, c_g, _ = st.columns([1, 2, 1])
     with c_g:
         fig, _ = plot_mct_abaco()
         st.pyplot(fig, use_container_width=True)

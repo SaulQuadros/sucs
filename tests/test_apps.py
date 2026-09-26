@@ -205,3 +205,14 @@ def test_mct_laboratorio_exemplo_barbosa():
     _ir(at, "paginas/mct.py")
     assert _grupo_na_tela(at, "LG'")
     assert any("12 golpes, série Parsons" in m.value for m in at.markdown)
+
+
+def test_mct_anexo_b_mostra_todos_os_grupos_sem_cortes():
+    from mct_core import PROPRIEDADES, tabela_anexo_b_html
+    html = tabela_anexo_b_html()
+    for g, p in PROPRIEDADES.items():
+        assert f">{g}<br>" in html and p["granulometria"] in html
+    assert "table-layout:fixed" in html and "width:100%" in html
+    at = _app("paginas/mct.py")
+    at.segmented_control(key="mct_modo").set_value("Quadro dos grupos").run()
+    assert not at.exception and any("<table" in m.value for m in at.markdown)
