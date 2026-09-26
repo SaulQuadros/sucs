@@ -165,18 +165,23 @@ def etapa_mini_mcv():
 def etapa_c():
     _, _, R, _ = dados()
     det = R.c_detalhe
-    (n1, n2), (m1, m2), (s1, s2) = det["cps"], det["mcv"], det["inclinacoes"]
+    (n1, n2), (m1, m2), w = det["cps"], det["mcv"], det["peso_superior"]
+    (xa, ya), (xb, yb) = det["linha"]
     st.markdown("O **coeficiente de argilosidade** é a inclinação do trecho retilíneo mais inclinado da curva "
-                "de deformabilidade com **Mini-MCV = 10**. Nenhum CP tem exatamente 10; por isso, a curva é "
-                "interpolada entre as duas vizinhas (Nota 3 da seção 3.10 da DNIT 258/2023-ME).")
+                "de deformabilidade com **Mini-MCV = 10** (DNIT 258/2023-ME, seção 3.10). Nenhum CP tem exatamente "
+                "10; por isso, essa curva é **interpolada** entre as duas vizinhas (Nota 3).")
     _latex(r"c' = \left|\frac{\Delta a_n}{\Delta(\text{Mini-MCV})}\right|")
-    st.markdown(f"Curvas vizinhas: **{n1}** (Mini-MCV {fmt(m1, 2)}) e **{n2}** (Mini-MCV {fmt(m2, 2)}). "
-                "Em cada uma, o trecho mais inclinado (destacado em cinza no gráfico) tem inclinação:")
-    _latex(rf"\left|\frac{{\Delta a_n}}{{\Delta(10\log n)}}\right|_{{{n1}}} = {fmt(s1, 2)}\qquad\qquad"
-             rf"\left|\frac{{\Delta a_n}}{{\Delta(10\log n)}}\right|_{{{n2}}} = {fmt(s2, 2)}")
-    st.markdown("A inclinação da curva com Mini-MCV = 10 é interpolada linearmente em Mini-MCV:")
-    _latex(rf"c' = {fmt(s1, 2)} + ({fmt(s2, 2)} - {fmt(s1, 2)})\,\frac{{10 - {fmt(m1, 2)}}}"
-             rf"{{{fmt(m2, 2)} - {fmt(m1, 2)}}} = {fmt(R.c_, 2)}")
+    st.markdown(f"**1. Curva interpolada.** As vizinhas são **{n1}** (Mini-MCV {fmt(m1, 2)}) e **{n2}** (Mini-MCV "
+                f"{fmt(m2, 2)}). Cada uma é deslocada no eixo para cruzar 2 mm em 10, e a curva com Mini-MCV = 10 é "
+                f"a média ponderada das duas, com peso maior para a mais próxima de 10:")
+    _latex(rf"w_{{{n2}}} = \frac{{10 - {fmt(m1, 2)}}}{{{fmt(m2, 2)} - {fmt(m1, 2)}}} = {fmt(w, 2)}\qquad "
+           rf"w_{{{n1}}} = 1 - {fmt(w, 2)} = {fmt(1 - w, 2)}")
+    st.markdown("Por construção, a curva interpolada (tracejada no gráfico) passa por **(10; 2 mm)**.")
+    st.markdown(f"**2. Trecho retilíneo mais inclinado** da curva interpolada: de 10·log n = {fmt(xa, 2)} "
+                f"(n = {fmt(10 ** (xa / 10), 2)} golpes; aₙ = {fmt(ya, 2)} mm) a {fmt(xb, 2)} "
+                f"(aₙ = {fmt(yb, 2)} mm), destacado com o triângulo amarelo:")
+    _latex(rf"c' = \frac{{{fmt(ya, 2)} - {fmt(yb, 2)}}}{{{fmt(xb, 2)} - {fmt(xa, 2)}}} = "
+           rf"\frac{{{fmt(ya - yb, 2)}}}{{{fmt(xb - xa, 2)}}} = {fmt(R.c_, 2)}")
     _grafico(plot_deformabilidade(R, destacar=True))
     st.caption("Na região laterítica do ábaco: c′ < 0,70 → areias (LA); 0,70 a 1,50 → arenosos (LA′); "
                "≥ 1,50 → argilosos (LG′).")
@@ -206,15 +211,16 @@ def etapa_meas():
 def etapa_d():
     _, _, R, _ = dados()
     jan = R.d_detalhe["janela"]
+    (xa, ya), (xb, yb) = R.d_detalhe["linha"]
     st.markdown("O **coeficiente d′** é a inclinação do trecho retilíneo mais inclinado do **ramo seco** da "
-                "curva de 12 golpes. O ramo seco vai do CP mais seco até o ponto de MEAS máxima.")
+                "curva de 12 golpes (DNIT 258/2023-ME, seção 3.12). O ramo seco vai do CP mais seco até o ponto "
+                "de MEAS máxima.")
     _latex(r"d' = \frac{\Delta\,\text{MEAS}}{\Delta h_c}")
     pts = " · ".join(f"({fmt(h)}%; {fmt(v, 0)})" for h, v in jan)
-    st.markdown(f"Trecho mais inclinado (três pontos, reta ajustada): {pts} kg/m³.")
-    (h0, v0), (h1, v1) = jan[0], jan[-1]
-    _latex(rf"d' \approx \frac{{{fmt(v1, 0)} - {fmt(v0, 0)}}}{{{fmt(h1)} - {fmt(h0)}}} = "
-             rf"{fmt((v1 - v0) / (h1 - h0), 1)}\qquad\text{{(reta ajustada aos três pontos: }}"
-             rf"d' = {fmt(R.d_, 1)}\ \text{{kg/m}}^3/\%\text{{)}}")
+    st.markdown(f"Trecho retilíneo mais inclinado: pontos {pts} kg/m³, com a reta ajustada a eles "
+                f"(triângulo amarelo no gráfico):")
+    _latex(rf"d' = \frac{{{fmt(yb, 0)} - {fmt(ya, 0)}}}{{{fmt(xb)} - {fmt(xa)}}} = "
+           rf"\frac{{{fmt(yb - ya, 0)}\ \text{{kg/m}}^3}}{{{fmt(xb - xa)}\ \%}} = {fmt(R.d_, 1)}\ \text{{kg/m}}^3/\%")
     _grafico(plot_compactacao(R, destacar=True))
     st.caption("Ramo seco íngreme (d′ alto) é típico de solos lateríticos argilosos; ramo suave (d′ baixo), de "
                "solos saprolíticos e siltosos. O Manual de Pavimentação descreve d′ como a inclinação "

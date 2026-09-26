@@ -120,6 +120,39 @@ def interpolar_em_mcv(pares: List[Tuple[float, float]], alvo: float) -> Optional
     return None
 
 
+def linha_da_janela(jan):
+    """Extremos da reta ajustada ao trecho retilíneo: ((x_ini, y_ini), (x_fim, y_fim))."""
+    xs, ys = [p[0] for p in jan], [p[1] for p in jan]
+    b, a = np.polyfit(xs, ys, 1)
+    return (xs[0], a + b * xs[0]), (xs[-1], a + b * xs[-1])
+
+
+def curva_mcv10(curvas, viz1, viz2, espacamento_min: float = 0.3):
+    """Curva de deformabilidade com Mini-MCV = 10, interpolada entre as curvas vizinhas (Nota 3, seção 3.10).
+    Cada vizinha é deslocada no eixo 10·log n para cruzar 2 mm em 10; a curva interpolada é a média ponderada
+    pela proximidade do Mini-MCV de cada uma a 10. Por construção, passa por (10; 2 mm).
+    Retorna (lista de pontos (x, a_n), peso da vizinha de Mini-MCV maior)."""
+    (n1, m1), (n2, m2) = viz1, viz2
+    w2 = 1.0 if abs(m2 - m1) < 1e-9 else (10.0 - m1) / (m2 - m1)
+
+    def desloc(nome, m):
+        return [(10 * math.log10(n) + (10.0 - m), a) for n, a in curvas[nome]]
+
+    p1, p2 = desloc(n1, m1), desloc(n2, m2)
+    lo, hi = max(p1[0][0], p2[0][0]), min(p1[-1][0], p2[-1][0])
+    xs = []
+    for x in sorted({x for x, _ in p1 + p2 if lo <= x <= hi}):
+        if not xs or x - xs[-1] >= espacamento_min:     # funde nós quase coincidentes das duas curvas
+            xs.append(x)
+    if lo <= 10.0 <= hi and 10.0 not in xs:              # inclui o ponto (10; 2 mm), sem remover nós reais
+        xs = sorted(xs + [10.0])
+
+    def val(p, x):
+        return float(np.interp(x, [q[0] for q in p], [q[1] for q in p]))
+
+    return [(x, (1 - w2) * val(p1, x) + w2 * val(p2, x)) for x in xs], w2
+
+
 @dataclass
 class ResultadoLab:
     serie: str
@@ -159,29 +192,22 @@ def calcular(cps: List[CorpoDeProva], serie: str) -> ResultadoLab:
     R.passos.append("Mini-MCV = 10·log(Bn), com Bn para afundamento de 2 mm: " + "; ".join(
         f"{cp.nome} (hc {fmt(cp.hc)}%) = {fmt(mcv[cp.nome], 2)}" for cp in cps if mcv[cp.nome] is not None))
 
-    # --- c': curvas vizinhas de Mini-MCV = 10 -------------------------------------------------------
+    # --- c': curva de deformabilidade com Mini-MCV = 10 (real ou interpolada, Nota 3 da seção 3.10) --------
     validos = sorted(((m, cp.nome) for cp in cps if (m := mcv[cp.nome]) is not None))
     abaixo = [v for v in validos if v[0] <= 10.0]
     acima = [v for v in validos if v[0] >= 10.0]
-
-    def incl(nome):
-        pts = [(10 * math.log10(n), a) for n, a in curvas[nome]]
-        return trecho_mais_inclinado(pts)
-
     if abaixo and acima:
         (m1, n1), (m2, n2) = abaixo[-1], acima[0]
-        s1, j1 = incl(n1)
-        s2, j2 = incl(n2)
-        if n1 == n2 or abs(m2 - m1) < 1e-9:
-            R.c_, w2 = s1, 1.0
-        else:
-            w2 = (10.0 - m1) / (m2 - m1)
-            R.c_ = (1 - w2) * s1 + w2 * s2
-        R.c_detalhe = {"cps": (n1, n2), "mcv": (m1, m2), "inclinacoes": (s1, s2), "janelas": (j1, j2),
-                       "peso_superior": w2}
+        curva10, w2 = curva_mcv10(curvas, (n1, m1), (n2, m2))
+        s, jan = trecho_mais_inclinado(curva10)
+        R.c_ = s
+        R.c_detalhe = {"cps": (n1, n2), "mcv": (m1, m2), "peso_superior": w2, "curva": curva10, "janela": jan,
+                       "linha": linha_da_janela(jan)}
+        (xa, ya), (xb, yb) = R.c_detalhe["linha"]
         R.passos.append(
-            f"c': curva com Mini-MCV = 10 interpolada entre {n1} (Mini-MCV {fmt(m1, 2)}, trecho mais inclinado "
-            f"{fmt(s1, 2)}) e {n2} (Mini-MCV {fmt(m2, 2)}, {fmt(s2, 2)}) → c' = {fmt(R.c_, 2)}")
+            f"c': curva com Mini-MCV = 10 interpolada entre {n1} (Mini-MCV {fmt(m1, 2)}) e {n2} (Mini-MCV "
+            f"{fmt(m2, 2)}); trecho retilíneo mais inclinado de 10·log n = {fmt(xa, 2)} a {fmt(xb, 2)}: "
+            f"c' = {fmt(ya - yb, 2)}/{fmt(xb - xa, 2)} = {fmt(R.c_, 2)}")
     else:
         R.avisos.append("Os Mini-MCV dos corpos de prova não envolvem o valor 10; c' não determinado "
                         "(a norma pede curvas dos dois lados de Mini-MCV = 10).")
@@ -195,7 +221,8 @@ def calcular(cps: List[CorpoDeProva], serie: str) -> ResultadoLab:
         if len(seco) >= 2:
             s, jan = trecho_mais_inclinado(seco, crescente=True)
             R.d_ = s
-            R.d_detalhe = {"golpes": nref, "pontos": comp, "ramo_seco": seco, "janela": jan}
+            R.d_detalhe = {"golpes": nref, "pontos": comp, "ramo_seco": seco, "janela": jan,
+                           "linha": linha_da_janela(jan)}
             R.passos.append(f"d': ramo seco da curva de {nref} golpes, trecho mais inclinado entre hc "
                             f"{fmt(jan[0][0])}% e {fmt(jan[-1][0])}% → d' = {fmt(R.d_, 1)} kg/m³/%")
         else:
@@ -254,20 +281,46 @@ def _fig(titulo, xl, yl):
     return fig, ax
 
 
+def _triangulo(ax, p_ini, p_fim, rot_vertical, rot_horizontal, descendente=True):
+    """Triângulo de inclinação (amarelo) sobre a reta do trecho retilíneo, com os catetos rotulados."""
+    (xa, ya), (xb, yb) = p_ini, p_fim
+    amarelo = "#E8B900"
+    if descendente:                       # c′: cateto vertical em xa, horizontal em yb
+        ax.plot([xa, xa, xb], [ya, yb, yb], color=amarelo, lw=2.2, zorder=6)
+        ax.annotate(rot_vertical, (xa, (ya + yb) / 2), xytext=(-6, 0), textcoords="offset points", ha="right",
+                    va="center", fontsize=8.5, color="#7a5d00", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+        ax.annotate(rot_horizontal, ((xa + xb) / 2, yb), xytext=(0, -9), textcoords="offset points", ha="center",
+                    va="top", fontsize=8.5, color="#7a5d00", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+    else:                                 # d′: cateto horizontal em ya, vertical em xb
+        ax.plot([xa, xb, xb], [ya, ya, yb], color=amarelo, lw=2.2, zorder=6)
+        ax.annotate(rot_horizontal, ((xa + xb) / 2, ya), xytext=(0, -9), textcoords="offset points", ha="center",
+                    va="top", fontsize=8.5, color="#7a5d00", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+        ax.annotate(rot_vertical, (xb, (ya + yb) / 2), xytext=(6, 0), textcoords="offset points", ha="left",
+                    va="center", fontsize=8.5, color="#7a5d00", bbox=dict(fc="white", ec="none", alpha=0.85, pad=1))
+
+
 def plot_deformabilidade(R: ResultadoLab, destacar: bool = True):
-    fig, ax = _fig("Curvas de deformabilidade (Figura A10)", "10·log₁₀(nº de golpes)", "Afundamento an (mm)")
+    fig, ax = _fig("Curvas de deformabilidade (Figura A10)", "Mini-MCV = 10·log₁₀(nº de golpes)",
+                   "Afundamento aₙ (mm)")
     for cp in R.cps:
         pts = R.curvas[cp.nome]
         ax.plot([10 * math.log10(n) for n, _ in pts], [a for _, a in pts], marker="o", ms=3.5, lw=1.2,
                 label=f"{cp.nome} (hc {fmt(cp.hc)}%)")
     ax.axhline(2.0, color="gray", ls=":", lw=1); ax.axvline(10.0, color="gray", ls=":", lw=1)
-    for jan in (R.c_detalhe.get("janelas", ()) if destacar else ()):
-        if jan:
-            ax.plot([p[0] for p in jan], [p[1] for p in jan], color="black", lw=3.2, alpha=0.55, zorder=4)
-    if destacar and R.c_ is not None:
-        ax.text(0.98, 0.95, f"c' = {fmt(R.c_, 2)}", transform=ax.transAxes, ha="right", va="top",
-                fontsize=10, bbox=dict(fc="white", ec="gray", lw=0.6))
-    ax.legend(fontsize=7.5)
+    det = R.c_detalhe
+    if destacar and det.get("curva"):
+        cx, cy = zip(*det["curva"])
+        ax.plot(cx, cy, color="black", ls="--", lw=1.8, zorder=5, label="Interpolada (Mini-MCV = 10)")
+        ax.scatter([10], [2], color="black", s=22, zorder=7)
+        (xa, ya), (xb, yb) = det["linha"]
+        ax.plot([xa, xb], [ya, yb], color="black", lw=4.0, alpha=0.8, zorder=6,
+                label=f"Trecho retilíneo: c′ = {fmt(ya - yb, 2)}/{fmt(xb - xa, 2)} = {fmt(R.c_, 2)}")
+        _triangulo(ax, (xa, ya), (xb, yb), f"Δaₙ = {fmt(ya - yb, 2)}", f"ΔMini-MCV = {fmt(xb - xa, 2)}")
+        ax.annotate(f"({fmt(xa, 2)}; {fmt(ya, 2)})\nn = {fmt(10 ** (xa / 10), 2)} golpes", (xa, ya), xytext=(-10, 10),
+                    textcoords="offset points", ha="right", fontsize=8, color="#333",
+                    arrowprops=dict(arrowstyle="-", color="#999", lw=0.8),
+                    bbox=dict(fc="white", ec="#ccc", lw=0.6, pad=2))
+    ax.legend(fontsize=7.3, loc="upper right", framealpha=0.95)
     fig.tight_layout()
     return fig
 
@@ -280,43 +333,63 @@ def plot_compactacao(R: ResultadoLab, destacar: bool = True):
         if len(pts) >= 2:
             ax.plot(*zip(*pts), marker="o", ms=3.5, lw=2.2 if n == nref else 1.0,
                     color="tab:red" if n == nref else None, label=f"{n} golpes" + (" (referência)" if n == nref else ""))
-    jan = R.d_detalhe.get("janela") if destacar else None
-    if jan:
-        ax.plot([p[0] for p in jan], [p[1] for p in jan], color="black", lw=3.2, alpha=0.55, zorder=4)
-        ax.text(0.02, 0.95, f"d' = {fmt(R.d_, 1)} kg/m³/%", transform=ax.transAxes, va="top", fontsize=10,
-                bbox=dict(fc="white", ec="gray", lw=0.6))
-    ax.legend(fontsize=7.5, loc="lower right")
+    det = R.d_detalhe
+    if destacar and det.get("linha"):
+        (xa, ya), (xb, yb) = det["linha"]
+        ax.plot([xa, xb], [ya, yb], color="black", lw=4.0, alpha=0.8, zorder=6,
+                label=f"Trecho retilíneo: d′ = {fmt(yb - ya, 0)}/{fmt(xb - xa, 1)} = {fmt(R.d_, 1)}")
+        _triangulo(ax, (xa, ya), (xb, yb), f"ΔMEAS = {fmt(yb - ya, 0)} kg/m³", f"Δhc = {fmt(xb - xa, 1)}%",
+                   descendente=False)
+    ax.legend(fontsize=7.3, loc="lower right", framealpha=0.95)
     fig.tight_layout()
     return fig
 
 
+def _chamada(ax, x, y, texto_y, texto_ponto, cor="tab:red"):
+    """Linhas de chamada do ponto (x, y) até os eixos, com o valor lido no eixo vertical."""
+    x0, y0 = ax.get_xlim()[0], ax.get_ylim()[0]
+    ax.plot([x, x], [y0, y], color=cor, ls="--", lw=1.0, zorder=4)
+    ax.plot([x0, x], [y, y], color=cor, ls="--", lw=1.0, zorder=4)
+    ax.scatter([x], [y], color=cor, s=40, zorder=6)
+    ax.annotate(texto_y, (x0, y), xytext=(4, 3), textcoords="offset points", fontsize=8.5, color=cor)
+    ax.annotate(texto_ponto, (x, y), xytext=(8, 8), textcoords="offset points", fontsize=9, color=cor,
+                bbox=dict(fc="white", ec=cor, lw=0.6, alpha=0.95, pad=2))
+
+
 def plot_af(R: ResultadoLab):
-    fig, ax = _fig("Altura final × Mini-MCV", "Mini-MCV", "Altura final do CP (mm)")
+    fig, ax = _fig("Altura final × Mini-MCV (DNIT 259/2023-CLA, seção 3.8)", "Mini-MCV", "Altura final do CP (mm)")
     pts = sorted((R.mcv[cp.nome], cp.af) for cp in R.cps if R.mcv[cp.nome] is not None)
     if pts:
-        ax.plot(*zip(*pts), marker="o", color="tab:blue")
-    ax.axvline(10, color="gray", ls=":"); ax.axhline(48, color="tab:orange", ls="--", lw=1)
-    ax.text(0.99, 48, "48 mm", transform=ax.get_yaxis_transform(), ha="right", va="bottom",
-            color="tab:orange", fontsize=8)
+        ax.plot(*zip(*pts), marker="o", color="tab:blue", label="CPs")
+        for (m, a), cp in zip(pts, sorted((c for c in R.cps if R.mcv[c.nome] is not None), key=lambda c: R.mcv[c.nome])):
+            ax.annotate(cp.nome, (m, a), xytext=(0, -12), textcoords="offset points", ha="center", fontsize=7.5,
+                        color="tab:blue")
+    ax.axhline(48, color="tab:orange", ls="-", lw=1.2)
+    ax.text(0.99, 48, "48 mm: limite entre alta e baixa densidade", transform=ax.get_yaxis_transform(), ha="right",
+            va="bottom", color="tab:orange", fontsize=8)
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(min(lo, 47.5), hi)
     if R.af10 is not None:
-        ax.scatter([10], [R.af10], color="tab:red", zorder=5)
-        ax.annotate(f"{fmt(R.af10, 2)} mm → {R.densidade} densidade", (10, R.af10), xytext=(8, 8),
-                    textcoords="offset points", fontsize=9, color="tab:red")
+        _chamada(ax, 10, R.af10, f"Af(10) = {fmt(R.af10, 2)} mm", f"{fmt(R.af10, 2)} mm → {R.densidade} densidade")
     fig.tight_layout()
     return fig
 
 
 def plot_pi(R: ResultadoLab):
     fig, ax = _fig("Perda de massa por imersão × Mini-MCV", "Mini-MCV", "Pi (%)")
-    pts = sorted((R.mcv[cp.nome], cp.pi) for cp in R.cps if R.mcv[cp.nome] is not None and cp.pi is not None)
+    pts = sorted((R.mcv[cp.nome], cp.pi, cp.nome) for cp in R.cps if R.mcv[cp.nome] is not None and cp.pi is not None)
     if pts:
-        ax.plot(*zip(*pts), marker="o", color="tab:green")
-    for m in (10, 15):
-        ax.axvline(m, color="gray", ls=":")
+        ax.plot([p[0] for p in pts], [p[1] for p in pts], marker="o", color="tab:green")
+        for m, v, nome in pts:
+            ax.annotate(nome, (m, v), xytext=(0, 7), textcoords="offset points", ha="center", fontsize=7.5,
+                        color="tab:green")
+    for mm in (10, 15):
+        ax.axvline(mm, color="gray", ls=":", lw=1)
+    lo, hi = ax.get_ylim()
+    ax.set_ylim(min(lo, 0), hi)
     if R.pi_ref is not None:
-        ax.scatter([R.mcv_pi], [R.pi_ref], color="tab:red", zorder=5)
-        ax.annotate(f"Pi' = {fmt(R.pi_ref, 1)}% (Mini-MCV {R.mcv_pi})", (R.mcv_pi, R.pi_ref), xytext=(8, 8),
-                    textcoords="offset points", fontsize=9, color="tab:red")
+        _chamada(ax, R.mcv_pi, R.pi_ref, f"Pi′ = {fmt(R.pi_ref, 1)}%",
+                 f"Pi′ = {fmt(R.pi_ref, 1)}% (Mini-MCV {R.mcv_pi}; {R.densidade} densidade)")
     fig.tight_layout()
     return fig
 

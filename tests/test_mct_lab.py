@@ -58,3 +58,16 @@ def test_tabelas_ida_e_volta():
 def test_poucos_dados_e_erro():
     with pytest.raises(ValueError):
         calcular([CorpoDeProva("x", 20, {1: 60.0, 4: 55.0})], "Parsons")
+
+
+def test_c_na_curva_interpolada_com_mini_mcv_10():
+    import numpy as np
+    for fn in (exemplo_barbosa_2021, exemplo_dnit_258):
+        serie, cps, _ = fn()
+        R = calcular(cps, serie)
+        cx, cy = zip(*R.c_detalhe["curva"])
+        assert float(np.interp(10.0, cx, cy)) == pytest.approx(2.0, abs=1e-9)    # passa por (10; 2 mm)
+        (xa, ya), (xb, yb) = R.c_detalhe["linha"]
+        assert (ya - yb) / (xb - xa) == pytest.approx(R.c_, rel=1e-9)            # triângulo = c′
+        (ha, ma), (hb, mb) = R.d_detalhe["linha"]
+        assert (mb - ma) / (hb - ha) == pytest.approx(R.d_, rel=1e-9)            # triângulo = d′

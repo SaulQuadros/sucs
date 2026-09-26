@@ -71,11 +71,14 @@ O que o usuário preenche é preservado ao trocar de página (`estado.py`): todo
 - Ábaco da Figura A1 pelos vértices cotados: (0,27; 2,2), (0,45; 1,75), (0,59; 1,4), (0,70; 1,15), (1,7; 1,15) e c' = 1,5.
 - Critério de desempate perto da fronteira L|N (item 5.1 c) e aviso de ponto próximo a qualquer fronteira.
 - **Modo laboratório** (`mct_lab.py`): das alturas do CP por nº de golpes (séries de Parsons ou Simplificada)
-  e dos dados de imersão calcula afundamentos, Mini-MCV, c' (curva interpolada com Mini-MCV = 10), MEAS,
+  e dos dados de imersão calcula afundamentos, Mini-MCV, c' (medido na curva com Mini-MCV = 10, interpolada
+  entre as vizinhas deslocadas para cruzar 2 mm em 10 e ponderadas pela proximidade), MEAS,
   d' (ramo seco da curva de 12 ou 10 golpes), Pi, altura final e Pi' no Mini-MCV 10/15 e os critérios do
-  item 5.1 c; plota as curvas de deformabilidade, compactação, altura final e Pi × Mini-MCV. O trecho
+  item 5.1 c; plota as curvas de deformabilidade (com a curva interpolada e o triângulo Δaₙ/ΔMini-MCV),
+  de compactação (triângulo ΔMEAS/Δhc), de altura final e de Pi × Mini-MCV (leituras em 10/15). O trecho
   "retilíneo mais inclinado" é automático (janela de 3 pontos) e pode ser ajustado pelo usuário.
-  Validado com a planilha da Figura A8 da DNIT 258/2023 (c' = 1,20) e com Barbosa (2021), TCC UFJF (LG').
+  Validado com a planilha da Figura A8 da DNIT 258/2023 (norma: c' = 1,20; app: 1,16) e com Barbosa (2021),
+  TCC UFJF (c' = 2,38 → LG').
 
 ## 📁 Estrutura
 
