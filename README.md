@@ -40,6 +40,8 @@ O menu fica na barra superior. Cada chave de `MENUS` em `sucs_app.py` é um menu
 (hoje: **Classificação de Solos** → SUCS, TRB, MCT). Novos módulos entram como novas chaves.
 Para usar o menu lateral em vez da barra superior, troque `position="top"` por `position="sidebar"`.
 
+A % passante na #200, o LL, o LP e o NP são compartilhados entre SUCS e TRB (chaves `comum_*`).
+
 A barra superior define o conteúdo da página; a barra lateral traz informações complementares (projeto).
 O que o usuário preenche é preservado ao trocar de página (`estado.py`): todo widget de entrada deve usar
 `**keep("chave_unica", valor_padrão)` em vez de `value=`/`index=`. O último resultado de cada página e o
@@ -48,6 +50,8 @@ O que o usuário preenche é preservado ao trocar de página (`estado.py`): todo
 ## ⚙️ Regras implementadas (resumo)
 
 **SUCS**
+- Entrada em % passante na #4 e na #200 (como na ficha de laboratório); o formato antigo
+  (pct_retido_200 + pedregulho/areia da fração graúda) continua aceito no lote.
 - Mais de 50% retido na #200 → grossa; 50% ou mais passando → fina.
 - G quando 50% ou mais da fração graúda fica retida na #4; senão S.
 - Finos < 5%: W/P por Cu e Cc (pedregulho Cu ≥ 4; areia Cu ≥ 6; 1 ≤ Cc ≤ 3). Cu/Cc podem vir de D10, D30, D60.

@@ -3,7 +3,9 @@
 # com a Errata 1): Tabela 5, Figura 17 (gráfico de plasticidade) e fluxograma de identificação em
 # laboratório. Pode ser importado tanto por scripts de terminal quanto pelo app Streamlit.
 
+from dataclasses import dataclass, field
 from datetime import datetime
+from typing import List, Optional
 import math
 import re
 
@@ -157,40 +159,89 @@ def fines_nature(LL, LP):
     return None if z is None else ("C" if z == "C" else "M")
 
 
-def _finalize(grp, report):
-    desc = dnit_description_for_group(grp)
-    if desc:
-        report.append(f"Descrição (Tabela 5, Manual IPR-719): {desc}")
-    cbr = cbr_for_group(grp)
-    if cbr:
-        report.append(f"CBR provável (Tabela 13, Manual IPR-719): {cbr}%")
-    trb = trb_for_group(grp)
-    if trb:
-        s, (mp, p, pi) = trb
-        report.append(f"TRB (Tabela 12, Manual IPR-719) para {s}: mais provável {mp}; possível {p}; "
-                      f"possível, mas improvável {pi}")
-    return grp, "\n".join(report)
+def fmt(x, nd=1) -> str:
+    """Número com vírgula decimal (padrão brasileiro)."""
+    return f"{x:.{nd}f}".replace(".", ",")
 
 
-def classify_sucs(data):
+@dataclass
+class SUCSResult:
+    group: str
+    entradas: List[str] = field(default_factory=list)   # dados usados (já com derivados)
+    passos: List[str] = field(default_factory=list)     # regras acionadas, em ordem
+    avisos: List[str] = field(default_factory=list)     # pendências e observações
+    pct_finos: Optional[float] = None
+    LL: Optional[float] = None
+    IP: Optional[float] = None
+    NP: bool = False
+
+    @property
+    def completo(self) -> bool:
+        """False quando falta dado para fechar o símbolo (ex.: 'SW/SP-SC')."""
+        return "/" not in self.group
+
+    @property
+    def descricao(self) -> Optional[str]:
+        return dnit_description_for_group(self.group)
+
+    @property
+    def cbr(self) -> Optional[str]:
+        return cbr_for_group(self.group)
+
+    @property
+    def trb(self):
+        return trb_for_group(self.group)
+
+    def relatorio(self, meta: Optional[dict] = None) -> str:
+        L = ["=== Classificação SUCS — Manual de Pavimentação DNIT (IPR-719) ==="]
+        meta = meta or {}
+        for k, rot in (("projeto", "Projeto"), ("tecnico", "Técnico"), ("amostra", "Amostra")):
+            if meta.get(k):
+                L.append(f"{rot}: {meta[k]}")
+        L += [f"Data/hora: {datetime.now().strftime('%d/%m/%Y %H:%M')}", f"Grupo: {self.group}", "",
+              "Entradas:"] + [f"  {x}" for x in self.entradas]
+        L += ["", "Regras acionadas:"] + [f"  • {x}" for x in self.passos]
+        if self.avisos:
+            L += ["", "Avisos:"] + [f"  ⚠ {x}" for x in self.avisos]
+        L.append("")
+        if self.descricao:
+            L.append(f"Descrição (Tabela 5, Manual IPR-719): {self.descricao}")
+        if self.cbr:
+            L.append(f"CBR provável (Tabela 13, Manual IPR-719): {self.cbr}%")
+        if self.trb:
+            s, (mp, pp, pi) = self.trb
+            L.append(f"TRB (Tabela 12, Manual IPR-719) para {s}: mais provável {mp}; possível {pp}; "
+                     f"possível, mas improvável {pi}")
+        return "\n".join(L)
+
+
+def _retido_e_fracoes(data):
+    """Aceita % passante (P4, P200) ou a forma antiga (pct_retido_200, pedregulho/areia da fração graúda).
+    Retorna (pct_retido_200, pct_pedregulho_coarse, pct_areia_coarse, P4, P200)."""
+    p200, p4 = _num(data.get("P200")), _num(data.get("P4"))
+    if p200 is not None:
+        if not (0.0 <= p200 <= 100.0):
+            raise ValueError("% passante na #200 deve estar entre 0 e 100.")
+        if p4 is not None:
+            if not (p200 <= p4 <= 100.0):
+                raise ValueError("As peneiras devem obedecer: #200 ≤ #4 ≤ 100.")
+            return 100.0 - p200, 100.0 - p4, p4 - p200, p4, p200
+        return 100.0 - p200, _num(data.get("pct_pedregulho_coarse")), _num(data.get("pct_areia_coarse")), None, p200
+    ret = _num(data.get("pct_retido_200"))
+    if ret is None or not (0.0 <= ret <= 100.0):
+        raise ValueError("Informe a % passante na #200 (ou a % retida na #200), entre 0 e 100.")
+    return ret, _num(data.get("pct_pedregulho_coarse")), _num(data.get("pct_areia_coarse")), None, None
+
+
+def classify_sucs_result(data) -> SUCSResult:
     """
-    data: dict com chaves
-      projeto, tecnico, amostra
-      pct_retido_200 (0-100)
-      pct_pedregulho_coarse, pct_areia_coarse (na fração > #200; qualquer escala, são normalizados)
-      LL, LP ; NP (bool, opcional)
+    data: dict com
+      P4, P200 (% passante)  — ou, na forma antiga, pct_retido_200 + pct_pedregulho_coarse/pct_areia_coarse
+      LL, LP ; NP (bool)
       Cu, Cc (opcionais) ou D10, D30, D60 em mm (opcionais)
       organico (bool), turfa (bool)
-    Retorna (grupo, relatorio_txt)
     """
-    report = []
-    now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    report += [f"Projeto: {data.get('projeto') or ''}", f"Técnico: {data.get('tecnico') or ''}",
-               f"Amostra: {data.get('amostra') or ''}", f"Data/hora: {now}", ""]
-
-    pct_ret_200 = _num(data.get("pct_retido_200"))
-    if pct_ret_200 is None or not (0.0 <= pct_ret_200 <= 100.0):
-        raise ValueError("Informe a % retida na peneira #200 (0 a 100).")
+    pct_ret_200, pg, ps, P4, P200 = _retido_e_fracoes(data)
     pct_finos = 100.0 - pct_ret_200
 
     NP = _bool(data.get("NP", False))
@@ -203,126 +254,143 @@ def classify_sucs(data):
             raise ValueError("LP maior que LL: verifique os ensaios (ou marque NP).")
         IP = LL - LP
 
+    E: List[str] = []
+    passos: List[str] = []
+    avisos: List[str] = []
+
     Cu, Cc = _num(data.get("Cu")), _num(data.get("Cc"))
+    cu_por_d = False
     if Cu is None or Cc is None:
         Cu2, Cc2 = cu_cc(data.get("D10"), data.get("D30"), data.get("D60"))
         if Cu2 is not None:
-            Cu, Cc = Cu2, Cc2
-            report.append(f"Cu = D60/D10 = {Cu:.2f} ; Cc = D30²/(D60·D10) = {Cc:.2f}")
+            Cu, Cc, cu_por_d = Cu2, Cc2, True
+
+    if P4 is not None:
+        E.append(f"% passante: #4 = {fmt(P4)}% ; #200 = {fmt(P200)}%")
+    elif P200 is not None:
+        E.append(f"% passante na #200 = {fmt(P200)}%")
+    E.append(f"% de finos = {fmt(pct_finos)}% ; % retido na #200 = {fmt(pct_ret_200)}%")
+    if NP:
+        E.append("IP = NP (não plástico)")
+    elif IP is not None:
+        E.append(f"LL = {fmt(LL)} ; LP = {fmt(LP)} → IP = {fmt(IP)} (linha A: {fmt(line_a(LL))})")
+    else:
+        E.append("LL/LP: não informados")
+    if Cu is not None and Cc is not None:
+        E.append(f"Cu = {fmt(Cu, 2)} ; Cc = {fmt(Cc, 2)}" + (" (calculados por D10, D30, D60)" if cu_por_d else ""))
 
     organico = _bool(data.get("organico", False))
     turfa = _bool(data.get("turfa", False))
 
-    report.append("Entradas")
-    report.append(f"  % retido na #200: {pct_ret_200:.2f}%  |  % de finos: {pct_finos:.2f}%")
-    if NP:
-        report.append("  IP = NP (não plástico)")
-    elif IP is not None:
-        report.append(f"  LL = {LL:.2f} ; LP = {LP:.2f}  -> IP = {IP:.2f}  (linha A: {line_a(LL):.2f})")
-    else:
-        report.append("  LL/LP: não informados")
-    if Cu is not None and Cc is not None:
-        report.append(f"  Cu = {Cu:.2f} ; Cc = {Cc:.2f}")
+    def out(grp):
+        return SUCSResult(grp, E, passos, avisos, pct_finos, LL, IP, NP)
 
     if turfa:
-        report.append("Observação: material altamente orgânico (turfa).")
-        return _finalize("PT", report)
+        passos.append("Material altamente orgânico, fibroso (turfa) → PT")
+        return out("PT")
 
     zone = plasticity_zone(LL, LP, NP)
 
     # Tabela 5: mais de 50% retido na #200 → granulação grossa
     if pct_ret_200 > 50.0:
-        pg = _num(data.get("pct_pedregulho_coarse")) or 0.0
-        ps = _num(data.get("pct_areia_coarse")) or 0.0
-        total = pg + ps
-        if total <= 0:
-            raise ValueError("Solo grosso: informe % de pedregulho e de areia na fração > #200.")
-        pgn = 100.0 * pg / total
-        # Tabela 5: pedregulho quando 50% ou mais da fração graúda fica retida na #4
+        passos.append(f"{fmt(pct_ret_200)}% retido na #200 (> 50%) → granulação grossa")
+        pg, ps = pg or 0.0, ps or 0.0
+        if pg + ps <= 0:
+            raise ValueError("Solo grosso: informe a % passante na #4 (ou pedregulho e areia da fração graúda).")
+        pgn = 100.0 * pg / (pg + ps)
         coarse = "G" if pgn >= 50.0 else "S"
-        report.append(f"  Granulação grossa (> 50% retido na #200); fração graúda: pedregulho {pgn:.1f}%, "
-                      f"areia {100 - pgn:.1f}% -> {'pedregulho (G)' if coarse == 'G' else 'areia (S)'}")
-
+        passos.append(f"Fração graúda: pedregulho {fmt(pgn)}% e areia {fmt(100 - pgn)}% → "
+                      + ("pedregulho (G): 50% ou mais retido na #4" if coarse == "G" else "areia (S)"))
         wp = well_graded_letter(coarse, Cu, Cc)
+        grad_txt = None if wp is None else (
+            f"Cu = {fmt(Cu, 2)} {'≥' if Cu >= (6 if coarse == 'S' else 4) else '<'} {6 if coarse == 'S' else 4} e "
+            f"Cc = {fmt(Cc, 2)} {'dentro' if 1 <= round(Cc, 6) <= 3 else 'fora'} de 1 a 3 → "
+            f"{'bem graduado (W)' if wp == 'W' else 'mal graduado (P)'}")
+
         if pct_finos < 5.0:
+            passos.append(f"Finos {fmt(pct_finos)}% (< 5%) → a graduação decide W/P")
             if wp is None:
-                grp = f"{coarse}W/{coarse}P"
-                report.append("  Finos < 5%: informe Cu e Cc (ou D10, D30, D60) para decidir W (bem) ou P (mal graduado).")
-            else:
-                grp = coarse + wp
-                report.append(f"  Finos < 5% e graduação {'boa' if wp == 'W' else 'má'} -> {grp}")
-            return _finalize(grp, report)
+                avisos.append("Informe Cu e Cc (ou D10, D30, D60) para decidir W (bem) ou P (mal graduado).")
+                return out(f"{coarse}W/{coarse}P")
+            passos.append(grad_txt)
+            return out(coarse + wp)
 
         if pct_finos <= 12.0:
-            # Caso limite: símbolo duplo pela granulometria e pela plasticidade (ex.: GW-GM)
-            second = None if zone is None else coarse + ("M" if zone == "M" else "C")
+            passos.append(f"Finos {fmt(pct_finos)}% (entre 5% e 12%) → caso limite, símbolo duplo")
             first = None if wp is None else coarse + wp
-            grp = f"{first or coarse + 'W/' + coarse + 'P'}-{second or coarse + 'M/' + coarse + 'C'}"
-            report.append(f"  Finos entre 5% e 12% (caso limite, símbolo duplo): {grp}")
-            if first is None:
-                report.append("  Informe Cu e Cc (ou D10, D30, D60) para decidir W/P.")
-            if second is None:
-                report.append("  Informe LL e LP (ou NP) para decidir M/C.")
+            if grad_txt:
+                passos.append(grad_txt)
+            else:
+                avisos.append("Informe Cu e Cc (ou D10, D30, D60) para decidir W/P.")
+            second = None if zone is None else coarse + ("M" if zone == "M" else "C")
+            if zone is None:
+                avisos.append("Informe LL e LP (ou NP) para decidir M/C.")
             elif zone == "MC":
-                report.append("  Finos na zona hachurada: adotado o sufixo C (fino plástico).")
-            return _finalize(grp, report)
+                passos.append("Finos na zona hachurada → sufixo C (fino plástico)")
+            else:
+                passos.append(f"Finos {'abaixo' if zone == 'M' else 'acima'} da linha A → sufixo {second}")
+            return out(f"{first or coarse + 'W/' + coarse + 'P'}-{second or coarse + 'M/' + coarse + 'C'}")
 
-        # Finos > 12%
+        passos.append(f"Finos {fmt(pct_finos)}% (> 12%) → a plasticidade dos finos decide M/C")
         if zone is None:
-            grp = f"{coarse}M/{coarse}C"
-            report.append("  Finos > 12%: informe LL e LP (ou NP) para decidir M/C.")
-        elif zone == "MC":
-            grp = f"{coarse}M-{coarse}C"
-            report.append(f"  Finos > 12% na zona hachurada (4 ≤ IP ≤ 7, acima da linha A) -> {grp}")
-        else:
-            grp = coarse + ("M" if zone == "M" else "C")
-            report.append(f"  Finos > 12% {'abaixo' if zone == 'M' else 'acima'} da linha A -> {grp}")
-        return _finalize(grp, report)
+            avisos.append("Informe LL e LP (ou NP) para decidir M/C.")
+            return out(f"{coarse}M/{coarse}C")
+        if zone == "MC":
+            passos.append("Finos na zona hachurada (4 ≤ IP ≤ 7, acima da linha A) → símbolo duplo")
+            return out(f"{coarse}M-{coarse}C")
+        passos.append(f"Finos {'abaixo' if zone == 'M' else 'acima'} da linha A → {coarse}{'M' if zone == 'M' else 'C'}")
+        return out(coarse + ("M" if zone == "M" else "C"))
 
     # Granulação fina (50% ou mais passando na #200)
-    report.append("  Granulação fina (50% ou mais passando na #200)")
+    passos.append(f"{fmt(pct_finos)}% passando na #200 (≥ 50%) → granulação fina")
     if zone is None:
-        report.append("  LL/LP ausentes: não é possível posicionar no gráfico de plasticidade.")
-        return _finalize("ML/CL", report)
+        avisos.append("Informe LL e LP (ou NP) para posicionar no gráfico de plasticidade.")
+        return out("ML/CL")
     LLv = LL if LL is not None else 0.0
     LH = "L" if LLv <= LL_LH else "H"
+    passos.append(f"LL = {fmt(LLv)} {'≤' if LH == 'L' else '>'} 50 → {'baixa (L)' if LH == 'L' else 'alta (H)'} compressibilidade")
     if organico:
         if zone == "M":
-            grp = "O" + LH
-            report.append(f"  Orgânico, abaixo da linha A, LL {'≤' if LH == 'L' else '>'} 50 -> {grp}")
-            return _finalize(grp, report)
-        report.append("  Aviso: marcado como orgânico, mas o ponto está acima da linha A; "
-                      "o Manual classifica pela plasticidade (CL/CH).")
+            passos.append(f"Orgânico e abaixo da linha A → O{LH}")
+            return out("O" + LH)
+        avisos.append("Marcado como orgânico, mas o ponto está acima da linha A: "
+                      "o Manual classifica pela plasticidade.")
     if zone == "MC":
-        grp = "ML-CL"
-        report.append("  Zona hachurada (4 ≤ IP ≤ 7, acima da linha A) -> ML-CL")
+        passos.append("Zona hachurada (4 ≤ IP ≤ 7, acima da linha A) → ML-CL")
+        return out("ML-CL")
+    if zone == "M":
+        passos.append("Abaixo da linha A (ou IP < 4) → silte (M)" if not NP else "Não plástico → silte (M)")
     else:
-        grp = ("M" if zone == "M" else "C") + LH
-        report.append(f"  {'Silte (abaixo' if zone == 'M' else 'Argila (acima'} da linha A); "
-                      f"LL {'≤' if LH == 'L' else '>'} 50 -> {grp}")
-    return _finalize(grp, report)
+        passos.append("Acima da linha A → argila (C)")
+    return out(("M" if zone == "M" else "C") + LH)
 
 
-# Planilha-modelo: um exemplo por grupo (conferidos em tests/test_sucs.py).
+def classify_sucs(data):
+    """Compatibilidade: retorna (grupo, relatório em texto)."""
+    r = classify_sucs_result(data)
+    return r.group, r.relatorio({k: data.get(k) for k in ("projeto", "tecnico", "amostra")})
+
+
+# Planilha-modelo: um exemplo por grupo (conferidos em tests/test_sucs.py). Granulometria em % passante.
 EXEMPLOS = [
-    ("GW", "Pedregulho bem graduado, poucos finos", dict(pct_retido_200=97, pct_pedregulho_coarse=70, pct_areia_coarse=30, NP=True, Cu=8, Cc=2.0)),
-    ("GP", "Pedregulho mal graduado, poucos finos", dict(pct_retido_200=96, pct_pedregulho_coarse=60, pct_areia_coarse=40, NP=True, Cu=2, Cc=0.6)),
-    ("GM", "Pedregulho siltoso", dict(pct_retido_200=75, pct_pedregulho_coarse=60, pct_areia_coarse=40, LL=40, LP=27)),
-    ("GC", "Pedregulho argiloso", dict(pct_retido_200=75, pct_pedregulho_coarse=60, pct_areia_coarse=40, LL=40, LP=20)),
-    ("SW", "Areia bem graduada (Cu/Cc pelos diâmetros)", dict(pct_retido_200=97, pct_pedregulho_coarse=30, pct_areia_coarse=70, NP=True, D10=0.1, D30=0.3, D60=0.9)),
-    ("SP", "Areia mal graduada", dict(pct_retido_200=96, pct_pedregulho_coarse=30, pct_areia_coarse=70, NP=True, Cu=3, Cc=0.8)),
-    ("SM", "Areia siltosa", dict(pct_retido_200=75, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=40, LP=27)),
-    ("SC", "Areia argilosa", dict(pct_retido_200=75, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=40, LP=20)),
-    ("SW-SC", "Areia bem graduada com 8% de finos argilosos", dict(pct_retido_200=92, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=30, LP=15, Cu=7, Cc=2)),
-    ("SM-SC", "Areia com finos na zona hachurada", dict(pct_retido_200=70, pct_pedregulho_coarse=30, pct_areia_coarse=70, LL=25, LP=19)),
-    ("ML", "Silte de baixa compressibilidade", dict(pct_retido_200=30, LL=35, LP=25)),
-    ("CL", "Argila de baixa a média plasticidade", dict(pct_retido_200=30, LL=35, LP=22)),
-    ("ML-CL", "Fino na zona hachurada", dict(pct_retido_200=30, LL=25, LP=19)),
-    ("OL", "Silte orgânico de baixa plasticidade", dict(pct_retido_200=30, LL=35, LP=25, organico=True)),
-    ("MH", "Silte elástico (LL alto)", dict(pct_retido_200=30, LL=70, LP=40)),
-    ("CH", "Argila de alta plasticidade", dict(pct_retido_200=30, LL=70, LP=25)),
-    ("OH", "Argila orgânica de LL alto", dict(pct_retido_200=30, LL=60, LP=35, organico=True)),
-    ("PT", "Turfa", dict(pct_retido_200=10, LL=150, LP=50, organico=True, turfa=True)),
+    ("GW", "Pedregulho bem graduado, poucos finos", dict(P4=30, P200=3, NP=True, Cu=8, Cc=2.0)),
+    ("GP", "Pedregulho mal graduado, poucos finos", dict(P4=40, P200=4, NP=True, Cu=2, Cc=0.6)),
+    ("GM", "Pedregulho siltoso", dict(P4=40, P200=25, LL=40, LP=27)),
+    ("GC", "Pedregulho argiloso", dict(P4=40, P200=25, LL=40, LP=20)),
+    ("SW", "Areia bem graduada (Cu/Cc pelos diâmetros)", dict(P4=70, P200=3, NP=True, D10=0.1, D30=0.3, D60=0.9)),
+    ("SP", "Areia mal graduada", dict(P4=70, P200=4, NP=True, Cu=3, Cc=0.8)),
+    ("SM", "Areia siltosa", dict(P4=80, P200=25, LL=40, LP=27)),
+    ("SC", "Areia argilosa", dict(P4=80, P200=25, LL=40, LP=20)),
+    ("SW-SC", "Areia bem graduada com 8% de finos argilosos", dict(P4=75, P200=8, LL=30, LP=15, Cu=7, Cc=2)),
+    ("SM-SC", "Areia com finos na zona hachurada", dict(P4=80, P200=30, LL=25, LP=19)),
+    ("ML", "Silte de baixa compressibilidade", dict(P4=100, P200=70, LL=35, LP=25)),
+    ("CL", "Argila de baixa a média plasticidade", dict(P4=100, P200=70, LL=35, LP=22)),
+    ("ML-CL", "Fino na zona hachurada", dict(P4=100, P200=70, LL=25, LP=19)),
+    ("OL", "Silte orgânico de baixa plasticidade", dict(P4=100, P200=70, LL=35, LP=25, organico=True)),
+    ("MH", "Silte elástico (LL alto)", dict(P4=100, P200=70, LL=70, LP=40)),
+    ("CH", "Argila de alta plasticidade", dict(P4=100, P200=70, LL=70, LP=25)),
+    ("OH", "Argila orgânica de LL alto", dict(P4=100, P200=70, LL=60, LP=35, organico=True)),
+    ("PT", "Turfa", dict(P4=100, P200=90, LL=150, LP=50, organico=True, turfa=True)),
 ]
 
 
@@ -340,3 +408,38 @@ def classify_dataframe(df):
     res["grupo"] = out_groups
     res["relatorio"] = out_reports
     return res
+
+
+def plot_plasticidade(LL=None, IP=None, NP=False, label=None):
+    """Gráfico de plasticidade (Figura 17 do Manual IPR-719) com o ponto da amostra, se houver."""
+    import matplotlib.pyplot as plt
+    tem_ponto = (not NP) and LL is not None and IP is not None
+    fig, ax = plt.subplots(figsize=(6.4, 4.4))
+    x_max = max(100.0, (LL or 0) + 10)
+    ll_4 = 20 + HATCH_IP[0] / LINE_A_SLOPE   # linha A cruza IP = 4
+    ll_7 = 20 + HATCH_IP[1] / LINE_A_SLOPE   # linha A cruza IP = 7
+    u_4, u_7 = 8 + HATCH_IP[0] / 0.9, 8 + HATCH_IP[1] / 0.9  # limite esquerdo (linha U: IP = 0,9·(LL − 8))
+    ax.plot([ll_4, x_max], [HATCH_IP[0], line_a(x_max)], color="black", lw=1.4)
+    ax.text(x_max * 0.80, line_a(x_max * 0.80) + 2.5, "Linha A", rotation=33, fontsize=9)
+    ax.fill([u_4, ll_4, ll_7, u_7], [4, 4, 7, 7], hatch="///", fill=False, edgecolor="gray", lw=0.8)
+    ax.text(12, 8, "ML-CL", fontsize=8, color="dimgray")
+    ax.axvline(LL_LH, color="black", lw=1.0, ls="--")
+    ax.text(LL_LH + 1, 57, "LL = 50", fontsize=8, color="dimgray")
+    for txt, x, y in [("CL", 36, 24), ("CH", 68, 46), ("ML ou OL", 30, 1.5), ("MH ou OH", 70, 16)]:
+        ax.text(x, y, txt, fontsize=10, fontweight="bold")
+    y_max = max(60.0, line_a(x_max) + 5)
+    if tem_ponto:
+        y_max = max(y_max, IP + 10)
+        ax.scatter([LL], [IP], color="tab:red", s=55, zorder=5)
+        ax.annotate(label or f"LL {fmt(LL, 0)} · IP {fmt(IP, 0)}", (LL, IP), xytext=(8, 8),
+                    textcoords="offset points", fontsize=9, color="tab:red", zorder=6,
+                    bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="tab:red", lw=0.6, alpha=0.95))
+    elif NP:
+        ax.text(0.5, 0.93, "Amostra não plástica (NP): sem ponto no gráfico", transform=ax.transAxes,
+                ha="center", fontsize=9, color="dimgray")
+    ax.set_xlim(0, x_max); ax.set_ylim(0, y_max)
+    ax.set_xlabel("Limite de liquidez LL (%)"); ax.set_ylabel("Índice de plasticidade IP (%)")
+    ax.set_title("Gráfico de plasticidade — Figura 17, Manual IPR-719", fontsize=10)
+    ax.grid(True, ls=":", alpha=0.5)
+    fig.tight_layout()
+    return fig

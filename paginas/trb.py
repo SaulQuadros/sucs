@@ -78,16 +78,19 @@ meta = get_meta()
 projeto, tecnico, amostra = meta["projeto"], meta["tecnico"], meta["amostra"]
 
 st.subheader("Granulometria (% passante)")
+st.caption("A % passante na #200 e os limites de Atterberg são compartilhados com a página SUCS (mesma amostra).")
 cg1, cg2, cg3 = st.columns(3)
 p10 = cg1.number_input("% passante #10", 0.0, 100.0, step=0.1, **keep("trb_p10", 0.0))
 p40 = cg2.number_input("% passante #40", 0.0, 100.0, step=0.1, **keep("trb_p40", 0.0))
-p200 = cg3.number_input("% passante #200", 0.0, 100.0, step=0.1, **keep("trb_p200", 0.0))
+p200 = cg3.number_input("% passante #200", 0.0, 100.0, step=0.1, placeholder="—", **keep("comum_p200", None))
 
 st.subheader("Plasticidade (Atterberg)")
 cp1, cp2, cp3 = st.columns(3)
-np_ = cp1.checkbox("Não plástico (NP)", **keep("trb_np", False))
-ll = cp2.number_input("LL (Limite de Liquidez)", 0.0, 300.0, step=0.1, **keep("trb_ll", 0.0))
-lp = cp3.number_input("LP (Limite de Plasticidade)", 0.0, 300.0, step=0.1, disabled=np_, **keep("trb_lp", 0.0))
+np_ = cp1.checkbox("Não plástico (NP)", **keep("comum_np", False))
+ll = cp2.number_input("LL (Limite de Liquidez)", 0.0, 300.0, step=0.1, placeholder="—", **keep("comum_ll", None))
+lp = cp3.number_input("LP (Limite de Plasticidade)", 0.0, 300.0, step=0.1, disabled=np_, placeholder="—",
+                     **keep("comum_lp", None))
+p200, ll, lp = p200 or 0.0, ll or 0.0, lp or 0.0  # campos compartilhados com o SUCS podem estar vazios
 st.caption("IP = **NP**" if np_ else f"IP calculado (LL − LP) = **{ll - lp:.2f}**")
 
 entrada = {"p10": p10, "p40": p40, "p200": p200, "ll": ll, "lp": 0.0 if np_ else lp, "np": np_}

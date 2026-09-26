@@ -87,3 +87,25 @@ def test_planilha_modelo_confere():
     from sucs_core import EXEMPLOS
     for g, _, p in EXEMPLOS:
         assert s(**p) == g, g
+
+
+def test_entrada_por_passante_equivale_a_retido():
+    from sucs_core import classify_sucs_result
+    # 8% passando na #200, 75% na #4 → retido 92%, pedregulho 25, areia 67 → S
+    r = classify_sucs_result(dict(P4=75, P200=8, LL=30, LP=15, Cu=7, Cc=2))
+    assert r.group == "SW-SC" and r.pct_finos == pytest.approx(8.0)
+    assert s(pct_retido_200=92, pct_pedregulho_coarse=25, pct_areia_coarse=67, LL=30, LP=15, Cu=7, Cc=2) == "SW-SC"
+
+
+def test_passante_4_menor_que_200_e_erro():
+    with pytest.raises(ValueError):
+        s(P4=10, P200=20, LL=30, LP=20)
+
+
+def test_resultado_estruturado():
+    from sucs_core import classify_sucs_result
+    r = classify_sucs_result(dict(P4=75, P200=8, LL=30, LP=15))
+    assert r.group == "SW/SP-SC" and not r.completo
+    assert any("Cu e Cc" in a for a in r.avisos)
+    assert r.passos[0].startswith("92,0% retido")          # vírgula decimal
+    assert "SC: 5 a 20" in r.cbr and r.trb[0] == "SW"

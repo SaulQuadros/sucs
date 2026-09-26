@@ -15,8 +15,14 @@ def keep(key: str, default) -> dict:
     """Argumentos para um widget cujo valor deve sobreviver à troca de página.
     Uso: st.number_input("LL", 0.0, 300.0, **keep("sucs_ll", 0.0))  — sem value=/index=."""
     ss = st.session_state
-    if key not in ss:
-        ss[key] = ss.get(_COPIA + key, default)
+    # Sempre restaura da cópia: além de sobreviver à troca de página, isso permite que a mesma chave seja
+    # usada em páginas diferentes (ex.: #200 e limites compartilhados entre SUCS e TRB) — sem isso o
+    # Streamlit trata o widget da outra página como novo e volta ao valor padrão. A cópia é atualizada
+    # pelo on_change, que o Streamlit executa antes do script.
+    if _COPIA + key in ss:
+        ss[key] = ss[_COPIA + key]
+    elif key not in ss:
+        ss[key] = default
     ss[_COPIA + key] = ss[key]
     return {"key": key, "on_change": _copiar, "args": (key,)}
 
