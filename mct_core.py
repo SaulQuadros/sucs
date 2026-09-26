@@ -10,6 +10,8 @@ import math
 
 import matplotlib.pyplot as plt
 
+from formato import fmt
+
 NORMA_CLA = "DNIT 259/2023-CLA"
 NORMA_ME = "DNIT 258/2023-ME"
 
@@ -194,11 +196,11 @@ def pi_referencia(pi_10: Optional[float], pi_15: Optional[float], af_10: Optiona
         v = _num(pi_10)
         if v is None:
             raise ValueError("AF ≥ 48 mm (baixa densidade): informe Pi no Mini-MCV = 10.")
-        return v, "baixa", f"AF = {af:.1f} mm ≥ 48,0 mm → baixa densidade → Pi' = Pi(Mini-MCV 10) = {v:.1f}%"
+        return v, "baixa", f"AF = {fmt(af, 1)} mm ≥ 48,0 mm → baixa densidade → Pi' = Pi(Mini-MCV 10) = {fmt(v, 1)}%"
     v = _num(pi_15)
     if v is None:
         raise ValueError("AF < 48 mm (alta densidade): informe Pi no Mini-MCV = 15.")
-    return v, "alta", f"AF = {af:.1f} mm < 48,0 mm → alta densidade → Pi' = Pi(Mini-MCV 15) = {v:.1f}%"
+    return v, "alta", f"AF = {fmt(af, 1)} mm < 48,0 mm → alta densidade → Pi' = Pi(Mini-MCV 15) = {fmt(v, 1)}%"
 
 
 def compute_e_prime(d_: float, pi_ref: float) -> float:
@@ -227,34 +229,34 @@ def classify_mct(c_: float, e_: float) -> Tuple[str, List[str]]:
     r: List[str] = []
     lim = fronteira_L_N(c_)
     if e_ <= lim:
-        r.append(f"e' = {e_:.3f} ≤ {lim:.3f} (fronteira L|N para c' = {c_:.3f}) → comportamento laterítico (L)")
+        r.append(f"e' = {fmt(e_, 3)} ≤ {fmt(lim, 3)} (fronteira L|N para c' = {fmt(c_, 3)}) → comportamento laterítico (L)")
         if c_ < C_LA_LA:
-            g = "LA"; r.append(f"c' < {C_LA_LA:.2f} → LA")
+            g = "LA"; r.append(f"c' < {fmt(C_LA_LA, 2)} → LA")
         elif c_ < C_A_G:
-            g = "LA'"; r.append(f"{C_LA_LA:.2f} ≤ c' < {C_A_G:.2f} → LA'")
+            g = "LA'"; r.append(f"{fmt(C_LA_LA, 2)} ≤ c' < {fmt(C_A_G, 2)} → LA'")
         else:
-            g = "LG'"; r.append(f"c' ≥ {C_A_G:.2f} → LG'")
+            g = "LG'"; r.append(f"c' ≥ {fmt(C_A_G, 2)} → LG'")
         return g, r
 
-    r.append(f"e' = {e_:.3f} > {lim:.3f} (fronteira L|N para c' = {c_:.3f}) → comportamento não laterítico (N)")
+    r.append(f"e' = {fmt(e_, 3)} > {fmt(lim, 3)} (fronteira L|N para c' = {fmt(c_, 3)}) → comportamento não laterítico (N)")
     c_na = _interp(LINHA_NA, e_, by="e")
     if c_ < c_na:
-        r.append(f"c' < {c_na:.3f} (linha inclinada NA para e' = {e_:.3f}) → NA")
+        r.append(f"c' < {fmt(c_na, 3)} (linha inclinada NA para e' = {fmt(e_, 3)}) → NA")
         return "NA", r
     if c_ >= C_NA_NG:
-        r.append(f"c' ≥ {C_NA_NG:.2f} → NG'")
+        r.append(f"c' ≥ {fmt(C_NA_NG, 2)} → NG'")
         return "NG'", r
     if c_ < LINHA_NS_NA[0][0]:
-        r.append(f"c' ≥ {c_na:.3f} e acima do vértice (0,45; 1,75) → NS'")
+        r.append(f"c' ≥ {fmt(c_na, 3)} e acima do vértice (0,45; 1,75) → NS'")
         return "NS'", r
     e_lim = _interp(LINHA_NS_NA, c_)
     if e_ > e_lim:
         if c_ < C_A_G:
-            r.append(f"e' > {e_lim:.3f} (linha NS'|NA') e c' < {C_A_G:.2f} → NS'")
+            r.append(f"e' > {fmt(e_lim, 3)} (linha NS'|NA') e c' < {fmt(C_A_G, 2)} → NS'")
             return "NS'", r
-        r.append(f"e' > {e_lim:.3f} (linha NS'|NA') e c' ≥ {C_A_G:.2f} → NG'")
+        r.append(f"e' > {fmt(e_lim, 3)} (linha NS'|NA') e c' ≥ {fmt(C_A_G, 2)} → NG'")
         return "NG'", r
-    r.append(f"e' ≤ {e_lim:.3f} (linha NS'|NA') e c' < {C_NA_NG:.2f} → NA'")
+    r.append(f"e' ≤ {fmt(e_lim, 3)} (linha NS'|NA') e c' < {fmt(C_NA_NG, 2)} → NA'")
     return "NA'", r
 
 
@@ -286,18 +288,18 @@ def classify_from_inputs(inp: MCTInput, *, tolerancia_LN: float = 0.05) -> MCTRe
             pi_ref, dens, txt = pi_referencia(inp.pi_10, inp.pi_15, inp.af_10)
             r.append(txt)
         else:
-            r.append(f"Pi' informado diretamente = {pi_ref:.1f}%")
+            r.append(f"Pi' informado diretamente = {fmt(pi_ref, 1)}%")
         e = compute_e_prime(inp.d_, pi_ref)
         golpes = 12 if str(inp.serie).lower().startswith("p") else 10
-        r.append(f"e' = ∛(Pi'/100 + 20/d') = ∛({pi_ref:.1f}/100 + 20/{_num(inp.d_):.1f}) = {e:.3f} "
+        r.append(f"e' = ∛(Pi'/100 + 20/d') = ∛({fmt(pi_ref, 1)}/100 + 20/{fmt(_num(inp.d_), 1)}) = {fmt(e, 3)} "
                  f"(d' da curva de {golpes} golpes, série {inp.serie})")
     else:
-        r.append(f"e' informado diretamente = {e:.3f}")
+        r.append(f"e' informado diretamente = {fmt(e, 3)}")
 
     if not (C_MIN <= c <= C_MAX):
-        w.append(f"c' = {c:.2f} fora do domínio do gráfico ({C_MIN}–{C_MAX}); classificação por extrapolação.")
+        w.append(f"c' = {fmt(c, 2)} fora do domínio do gráfico ({C_MIN}–{C_MAX}); classificação por extrapolação.")
     if not (E_MIN <= e <= E_MAX):
-        w.append(f"e' = {e:.2f} fora do domínio do gráfico ({E_MIN}–{E_MAX}); classificação por extrapolação.")
+        w.append(f"e' = {fmt(e, 2)} fora do domínio do gráfico ({E_MIN}–{E_MAX}); classificação por extrapolação.")
 
     g, rg = classify_mct(c, e)
     r += rg
@@ -306,7 +308,7 @@ def classify_from_inputs(inp: MCTInput, *, tolerancia_LN: float = 0.05) -> MCTRe
     if abs(dist) <= tolerancia_LN:
         crit = (inp.pi_inclinacao_negativa, inp.mcv_concavidade_para_cima)
         if None in crit:
-            w.append(f"Ponto próximo da fronteira L|N (Δe' = {dist:+.3f}). A norma manda verificar: "
+            w.append(f"Ponto próximo da fronteira L|N (Δe' = {'+' if dist >= 0 else '−'}{fmt(abs(dist), 3)}). A norma manda verificar: "
                      "(i) curva Pi × Mini-MCV com inclinação negativa entre Mini-MCV 10 e 15; "
                      "(ii) curva Mini-MCV × hc com concavidade para cima. Informe os dois critérios.")
         else:
@@ -358,7 +360,7 @@ def build_report(res: MCTResult, meta: Optional[Dict[str, str]] = None) -> str:
         L += [f"Projeto: {meta.get('projeto') or '-'}", f"Técnico: {meta.get('tecnico') or '-'}",
               f"Amostra: {meta.get('amostra') or '-'}"]
     L += [f"Grupo: {res.group} — {res.classe}, {p['nome'].lower()}",
-          f"c' = {res.c_:.3f}   e' = {res.e_:.3f}" + (f"   Pi' = {res.pi_ref:.1f}%" if res.pi_ref is not None else ""),
+          f"c' = {fmt(res.c_, 3)}   e' = {fmt(res.e_, 3)}" + (f"   Pi' = {fmt(res.pi_ref, 1)}%" if res.pi_ref is not None else ""),
           "", "Regras acionadas:"]
     L += [f"  • {x}" for x in res.rationale]
     if res.warnings:
@@ -412,7 +414,7 @@ def plot_point_on_abaco(c_: float, e_: float, ax=None, label: Optional[str] = No
         plot_mct_abaco(ax=ax)
     x = min(max(c_, C_MIN), C_MAX); y = min(max(e_, E_MIN), E_MAX)
     ax.scatter([x], [y], s=60, zorder=5, color="tab:red")
-    ax.annotate(label or f"(c'={c_:.2f}; e'={e_:.2f})", (x, y), xytext=(6, 8),
+    ax.annotate(label or f"(c'={fmt(c_, 2)}; e'={fmt(e_, 2)})", (x, y), xytext=(6, 8),
                 textcoords="offset points", fontsize=9)
     return (ax.figure, ax) if created else ax
 

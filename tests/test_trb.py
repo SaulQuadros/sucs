@@ -71,3 +71,11 @@ def test_planilha_modelo_confere():
     df = pd.DataFrame([dict(Grupo_esperado=g, **p) for g, _, p in EXEMPLOS])
     out = classify_dataframe_trb(df)
     assert list(out["Grupo_TRB"]) == list(out["Grupo_esperado"])
+
+
+def test_detalhe_do_ig():
+    r = classify_trb(90, 70, 55, 55, 30)       # a=20, b=40, c=15, d=15
+    d = r.ig_detalhe
+    assert (d["a"], d["b"], d["c"], d["d"]) == (20, 40, 15, 15)
+    assert d["ig_bruto"] == pytest.approx(11.5) and r.ig == 12
+    assert not r.granular and r.rationale[0].startswith("% passante na #200 = 55,0%")

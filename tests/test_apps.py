@@ -47,33 +47,53 @@ def test_sucs_modo_lote():
     assert not at.exception
 
 
+def _grupo_na_tela(at, grupo):
+    return any(f">{grupo}<" in m.value for m in at.markdown)
+
+
 def test_trb_ip_decimal():
     at = _app("paginas/trb.py")
-    vals = [80.0, 60.0, 30.0, 30.0, 19.5]                     # #10, #40, #200, LL, LP
-    for n, v in zip(at.number_input, vals):
-        n.set_value(v)
+    for k, v in [("trb_p10", 80.0), ("trb_p40", 60.0), ("comum_p200", 30.0), ("comum_ll", 30.0), ("comum_lp", 19.5)]:
+        at.number_input(key=k).set_value(v)
     at.run()
     _click(at, "Classificar")
-    assert "A-2-6" in at.success[0].value
+    assert _grupo_na_tela(at, "A-2-6")
+
+
+def test_trb_estado_inicial_e_lote():
+    at = _app("paginas/trb.py")
+    assert next(b for b in at.button if b.label == "Classificar").disabled
+    at.segmented_control(key="trb_modo").set_value("Lote (CSV/Excel)").run()
+    assert not at.exception
+
+
+def _preencher_mct(at):
+    for k, v in [("mct_c", 1.2), ("mct_d", 50.0), ("mct_af10", 47.0), ("mct_pi10", 80.0), ("mct_pi15", 20.0)]:
+        at.number_input(key=k).set_value(v)
+    at.run()
 
 
 def test_mct_individual():
     at = _app("paginas/mct.py")
+    assert next(b for b in at.button if b.label == "Classificar").disabled
+    _preencher_mct(at)
+    # AF = 47 → Pi' = Pi(15) = 20 → e' = ∛(0,20 + 20/50) = 0,843 → LA'
+    assert any("0,843" in c.value for c in at.caption)          # prévia de e' no quadro
     _click(at, "Classificar")
-    # padrão: c' = 1,20; d' = 50; AF = 47 → Pi' = Pi(15) = 20 → e' = 0,843 → LA'
-    assert any("LA'" in m.value for m in at.markdown)
+    assert _grupo_na_tela(at, "LA'")
 
 
-def test_mct_quadro():
+def test_mct_quadro_e_lote():
     at = _app("paginas/mct.py")
-    at.radio[0].set_value("Quadro dos grupos").run()
-    assert not at.exception
+    for modo in ("Quadro dos grupos", "Lote (CSV/Excel)"):
+        at.segmented_control(key="mct_modo").set_value(modo).run()
+        assert not at.exception
 
 
 def test_menu_navega_pelas_tres_paginas():
     at = _app("sucs_app.py")                                  # abre na página padrão (SUCS)
     assert at.title[0].value.startswith("Classificação SUCS")
-    for pagina, titulo in [("paginas/trb.py", "Classificador TRB"), ("paginas/mct.py", "Classificação MCT"),
+    for pagina, titulo in [("paginas/trb.py", "Classificação TRB"), ("paginas/mct.py", "Classificação MCT"),
                            ("paginas/sucs.py", "Classificação SUCS")]:
         at.switch_page(pagina).run()
         assert not at.exception, at.exception
@@ -148,7 +168,7 @@ def test_resultado_preservado_e_marcado_quando_desatualizado():
     _click(at, "Classificar")
     _ir(at, "paginas/mct.py")
     _ir(at, "paginas/trb.py")
-    assert "A-2-6" in at.success[0].value and not at.warning
+    assert _grupo_na_tela(at, "A-2-6") and not at.warning
     at.number_input(key="comum_ll").set_value(45.0).run()
     assert any("alterados" in w.value for w in at.warning)
 
@@ -156,10 +176,11 @@ def test_resultado_preservado_e_marcado_quando_desatualizado():
 def test_resultado_mct_preservado():
     at = _app("sucs_app.py")
     _ir(at, "paginas/mct.py")
+    _preencher_mct(at)
     _click(at, "Classificar")
     _ir(at, "paginas/sucs.py")
     _ir(at, "paginas/mct.py")
-    assert any("LA'" in m.value for m in at.markdown)
+    assert _grupo_na_tela(at, "LA'")
 
 
 def test_sucs_estado_inicial_sem_conclusoes():

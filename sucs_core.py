@@ -9,6 +9,8 @@ from typing import List, Optional
 import math
 import re
 
+from formato import fmt  # noqa: F401 (reexportado para as páginas)
+
 LINE_A_SLOPE = 0.73      # linha A: IP = 0,73·(LL − 20)
 HATCH_IP = (4.0, 7.0)    # zona hachurada (limítrofe) acima da linha A
 LL_LH = 50.0             # L: LL ≤ 50 ; H: LL > 50 (Tabela 5)
@@ -157,11 +159,6 @@ def plasticity_zone(LL, LP, NP=False):
 def fines_nature(LL, LP):
     z = plasticity_zone(LL, LP)
     return None if z is None else ("C" if z == "C" else "M")
-
-
-def fmt(x, nd=1) -> str:
-    """Número com vírgula decimal (padrão brasileiro)."""
-    return f"{x:.{nd}f}".replace(".", ",")
 
 
 @dataclass
