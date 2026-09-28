@@ -324,3 +324,19 @@ def test_trb_lp_zero_e_lp_maior_que_ll():
     assert any("DNER-ME 082/94" in i.value for i in at.info)
     _click(at, "Classificar")
     assert _grupo_na_tela(at, "A-2-4")
+
+
+@pytest.mark.parametrize("i", range(3))
+def test_exemplos_carregam_e_classificam_sucs_e_trb(i):
+    from exemplos_solos import EXEMPLOS
+    titulo, _, _, sucs, trb = EXEMPLOS[i]
+    at = _app("sucs_app.py")
+    at.selectbox(key="exemplo_solo").set_value(titulo).run()
+    _click(at, "Carregar exemplo")
+    assert _grupo_na_tela(at, sucs) and not at.warning and not at.error
+    _ir(at, "paginas/trb.py")                                   # mesmo solo já classificado no TRB
+    grupo, ig = trb.split(" (IG ")
+    assert _grupo_na_tela(at, grupo) and not at.error
+    assert str(at.metric[0].value) == ig.rstrip(")")
+    _click(at, "Limpar campos")
+    assert at.number_input(key="comum_p200").value is None and not _grupo_na_tela(at, grupo)

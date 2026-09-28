@@ -7,6 +7,7 @@ import pandas as pd
 import streamlit as st
 
 from didatica.generator_pdf import generate_random_sucs_pdf
+from exemplos_solos import classificar_automatico, seletor_exemplos
 from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
 from formato import fmt
 from projeto import get_meta
@@ -173,6 +174,7 @@ def mostrar_resultado(r, meta):
 
 
 def modo_amostra(meta):
+    seletor_exemplos("trb")
     c_g, c_p = st.columns([1.15, 1], gap="medium")
     with c_g:
         (p10, p40, p200), granular = quadro_granulometria()
@@ -180,8 +182,9 @@ def modo_amostra(meta):
         plast, plast_ok = quadro_plasticidade((p10, p40, p200), granular)
     entrada = {"p10": p10, "p40": p40, "p200": p200, **plast}
     pronto = granular is not None and plast_ok
-    if st.button("Classificar", type="primary", disabled=not pronto,
-                 help=None if pronto else "Preencha a granulometria e os limites (ou NP)."):
+    clicou = st.button("Classificar", type="primary", disabled=not pronto,
+                       help=None if pronto else "Preencha a granulometria e os limites (ou NP).")
+    if (clicou or classificar_automatico("trb")) and pronto:
         try:
             salvar_resultado("trb", entrada, classify_trb(p10, p40, p200, plast["ll"], plast["lp"],
                                                           is_np=plast["np"]))

@@ -5,6 +5,7 @@
 import pandas as pd
 import streamlit as st
 
+from exemplos_solos import classificar_automatico, seletor_exemplos
 from estado import aviso_desatualizado, keep, lote, salvar_resultado, ultimo_resultado
 from atterberg import avaliar
 from projeto import get_meta
@@ -196,6 +197,7 @@ def mostrar_resultado(r, meta):
 
 
 def modo_amostra(meta):
+    seletor_exemplos("sucs")
     c_g, c_p = st.columns(2, gap="medium")
     with c_g:
         g, grossa = quadro_granulometria()
@@ -203,8 +205,10 @@ def modo_amostra(meta):
         p, limites_ok = quadro_plasticidade(grossa)
     entrada = {**g, **p}
 
-    if st.button("Classificar", type="primary", disabled=grossa is None or not limites_ok,
-                 help="Complete a granulometria (nº 200 e, para solo grosso, nº 4)." if grossa is None else None):
+    pronto = grossa is not None and limites_ok
+    clicou = st.button("Classificar", type="primary", disabled=not pronto,
+                       help="Complete a granulometria (nº 200 e, para solo grosso, nº 4)." if grossa is None else None)
+    if (clicou or classificar_automatico("sucs")) and pronto:
         try:
             salvar_resultado("sucs", entrada, classify_sucs_result(entrada))
         except ValueError as e:
